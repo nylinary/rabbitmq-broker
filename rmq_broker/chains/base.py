@@ -1,7 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
 from typing import Callable, Union
-
+from rmq_broker.schemas import PreMessage, PostMessage
+from schema import SchemaError, Schema
 logger = logging.getLogger(__name__)
 
 
@@ -82,6 +83,10 @@ class AbstractChain(ABC):
         """
         pass  # pragma: no cover
 
+    @abstractmethod
+    def validate(self, data: dict[str, Union[str, dict[str, str]]]) -> None:
+        pass
+
 
 class BaseChain(AbstractChain):
     """
@@ -111,7 +116,12 @@ class BaseChain(AbstractChain):
             Метод handle() у родительского класса: если типы запроса переданного сообщения
             и конкретного экземпляра обработчика отличаются.
         """
-        assert isinstance(data, dict)
+        try:
+            self.validate(data, PreMessage)
+        except SchemaError as e:
+            logger.error("%s: handle(data): Error: %s" % (self.__class__.__name__, e))
+            return None
+        logger.debug("%s: handle(data): Successful validation" % self.__class__.__name__)
         response = {}
         if data["request_type"] == self.request_type:
             response["request_id"] = data["request_id"]
@@ -123,8 +133,13 @@ class BaseChain(AbstractChain):
                 % (self.__class__.__name__, data)
             )
             response.update(self.get_response_header(data))
-            logger.info(f"{self.__class__.__name__}: handle(data) response={response}")
-            return response
+            logger.info("%s: handle(data) response=%s" % (self.__class__.__name__, response))
+            try:
+                self.validate(data, PostMessage)
+                return response
+            except SchemaError as e:
+                logger.error("%s: handle(data): Error: %s" % (self.__class__.__name__, e))
+                return None
         else:
             return super().handle(data)
 
@@ -136,18 +151,15 @@ class BaseChain(AbstractChain):
             data (dict): Словарь с запросом.
 
         Raises:
-            KeyError: Любой из ключей ('src', 'dst') отсутствует в словаре запроса.
-            AssertionError: Переданный аргумент
+            ShemaError: Любой из ключей ('src', 'dst') отсутствует в словаре запроса.
 
         Returns:
             Словарь заголовка запроса.
         """
-        assert isinstance(data, dict)
-        for item in ["dst", "src"]:
-            if item not in data.get("header").keys():
-                logger.exception(
-                    "%s:  The %s field is missing in the message header"
-                    % (self.__class__.__name__, item)
-                )
-                raise KeyError(f"The {item} field is missing in the message header")
         return {"header": {"src": data["header"]["dst"], "dst": data["header"]["src"]}}
+
+    def validate(self, data: dict[str, Union[str, dict[str, str]]], schema: Schema) -> None:
+        logger.debug("%s.validate(data, schema): Started validation" % self.__class__.__name__)
+        logger.debug("%s.validate(data, schema): data=%s" % (self.__class__.__name__, data))
+        logger.debug("%s.validate(data, schema): schema%s" % (self.__class__.__name__, schema.__class__.__name__))
+        schema.validate(data)

@@ -1,4 +1,4 @@
-from schema import Schema, Optional
+from schema import Schema, Optional, Or
 PreMessage = Schema(
     {
         "request_type": str,
@@ -6,5 +6,16 @@ PreMessage = Schema(
         "header": {"src": str, "dst": str},
         "body": object,
         Optional("status"): dict
+    }
+)
+
+
+PostMessage = Schema(
+    {
+        "request_type": str,
+        "request_id": str,
+        "header": {"src": str, "dst": str},
+        "body": object,
+        "status": {"message": str, "code": Or(int, str)}
     }
 )
