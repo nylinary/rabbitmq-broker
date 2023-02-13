@@ -23,11 +23,10 @@ class AsyncRabbitMessageQueue(AsyncAbstractMessageQueue):
         except SchemaError as e:
             logger.error("%s.post_message: Message validation failed!: %s" % (self.__class__.__name__, e))
         else:
-            self.rpc.call(worker, kwargs=dict(data=data))
+            return await self.rpc.call(worker, kwargs=dict(data=data))
 
     async def register_tasks(self, routing_key: str, worker: callable):
         """Вызывать перед стартом консьюмера."""
-        self.rpc = await RPC.create(self.channel)
         await self.rpc.register(routing_key, worker, auto_delete=True)
 
     async def __aenter__(self):
@@ -40,6 +39,7 @@ class AsyncRabbitMessageQueue(AsyncAbstractMessageQueue):
                 self.broker_url,
             )
             self.channel = await self.connection.channel()
+            self.rpc = await RPC.create(self.channel)
         return self
     
     async def __aexit__(self, *args, **kwargs):
