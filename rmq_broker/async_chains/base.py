@@ -1,10 +1,10 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Callable, Union
-from rmq_broker.schemas import PreMessage, PostMessage
+from typing import Callable, Union, Any
+from rmq_broker.schemas import PreMessage, PostMessage, MessageTemplate
 from schema import SchemaError, Schema
 logger = logging.getLogger(__name__)
-
+from starlette import status
 
 class AbstractChain(ABC):
     """Интерфейс классов обработчиков.
@@ -54,7 +54,7 @@ class AbstractChain(ABC):
         """
         if hasattr(self, "_next_chain"):
             return await self._next_chain.handle(data)
-        return None
+        return self.form_response(MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, "Can't handle this request type")
 
     @abstractmethod
     def get_response_header(
@@ -79,13 +79,19 @@ class AbstractChain(ABC):
             data (dict): Словарь с запросом.
 
         Returns:
-            Cловарь c телом запроса.
+            Cловарь c ответом.
         """
         pass  # pragma: no cover
 
     @abstractmethod
     def validate(self, data: dict[str, Union[str, dict[str, str]]]) -> None:
-        pass
+        pass # pragma: no cover
+
+    def form_response(
+        self, data: dict, body: Any = {}, code: int = status.HTTP_200_OK, message: Union[int, str] = "") -> dict:
+        data.update({"body": body})
+        data.update({"status": {"message": str(message), "code": code}})
+        return data
 
 
 class BaseChain(AbstractChain):
@@ -120,7 +126,7 @@ class BaseChain(AbstractChain):
             self.validate(data, PreMessage)
         except SchemaError as e:
             logger.error("%s: handle(data): Error: %s" % (self.__class__.__name__, e))
-            return None
+            return self.form_response(MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e)
         logger.debug("%s: handle(data): Successful validation" % self.__class__.__name__)
         response = {}
         if data["request_type"] == self.request_type:
@@ -139,7 +145,7 @@ class BaseChain(AbstractChain):
                 return response
             except SchemaError as e:
                 logger.error("%s: handle(data): Error: %s" % (self.__class__.__name__, e))
-                return None
+                return self.form_response(MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e)
         else:
             return await super().handle(data)
 

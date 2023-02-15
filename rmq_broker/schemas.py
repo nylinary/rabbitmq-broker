@@ -19,3 +19,11 @@ PostMessage = Schema(
         "status": {"message": str, "code": Or(int, str)}
     }
 )
+
+MessageTemplate =     {
+        "request_type": "",
+        "request_id": "",
+        "header": {"src": "", "dst": ""},
+        "body": {},
+        "status": {"message": "", "code": ""}
+    }
