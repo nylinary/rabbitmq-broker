@@ -15,7 +15,7 @@ try:
     settings = importlib.import_module(settings_path)
 except ModuleNotFoundError as e:
     try:
-        settings_path = env("MICROSERVICE_SETTINGS", default=paths["FastAPI"])
+        settings_path = paths["FastAPI"]
         settings = importlib.import_module(settings_path)
     except ModuleNotFoundError as e:
         raise AttributeError(
