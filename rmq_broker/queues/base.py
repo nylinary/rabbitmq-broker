@@ -1,7 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
 
-import aio_pika
 from rmq_broker.settings import settings
 
 logger = logging.getLogger(__name__)

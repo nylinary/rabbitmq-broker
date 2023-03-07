@@ -1,11 +1,12 @@
-from rmq_broker.queues.base import AsyncAbstractMessageQueue
 import asyncio
-from rmq_broker.schemas import PreMessage
-from schema import SchemaError
 import logging
-from aio_pika.patterns import RPC
-import aio_pika
 
+import aio_pika
+from aio_pika.patterns import RPC
+from schema import SchemaError
+
+from rmq_broker.queues.base import AsyncAbstractMessageQueue
+from rmq_broker.schemas import PreMessage
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,11 @@ class AsyncRabbitMessageQueue(AsyncAbstractMessageQueue):
         try:
             PreMessage.validate(data)
         except SchemaError as e:
-            logger.error("%s.post_message: Message validation failed!: %s" % (self.__class__.__name__, e))
+            logger.error(
+                "{}.post_message: Message validation failed!: {}".format(
+                    self.__class__.__name__, e
+                )
+            )
         else:
             return await self.rpc.call(worker, kwargs=dict(data=data))
 
@@ -41,7 +46,7 @@ class AsyncRabbitMessageQueue(AsyncAbstractMessageQueue):
             self.channel = await self.connection.channel()
             self.rpc = await RPC.create(self.channel)
         return self
-    
+
     async def __aexit__(self, *args, **kwargs):
         await self.connection.close()
         await self.channel.close()

@@ -1,10 +1,14 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Callable, Union, Any
-from rmq_broker.schemas import PreMessage, PostMessage, MessageTemplate
-from schema import SchemaError, Schema
-logger = logging.getLogger(__name__)
+from typing import Any, Callable, Union
+
+from schema import Schema, SchemaError
 from starlette import status
+
+from rmq_broker.schemas import MessageTemplate, PostMessage, PreMessage
+
+logger = logging.getLogger(__name__)
+
 
 class AbstractChain(ABC):
     """Интерфейс классов обработчиков.
@@ -54,7 +58,12 @@ class AbstractChain(ABC):
         """
         if hasattr(self, "_next_chain"):
             return await self._next_chain.handle(data)
-        return self.form_response(MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, "Can't handle this request type")
+        return self.form_response(
+            MessageTemplate,
+            {},
+            status.HTTP_400_BAD_REQUEST,
+            "Can't handle this request type",
+        )
 
     @abstractmethod
     def get_response_header(
@@ -85,10 +94,15 @@ class AbstractChain(ABC):
 
     @abstractmethod
     def validate(self, data: dict[str, Union[str, dict[str, str]]]) -> None:
-        pass # pragma: no cover
+        pass  # pragma: no cover
 
     def form_response(
-        self, data: dict, body: Any = {}, code: int = status.HTTP_200_OK, message: Union[int, str] = "") -> dict:
+        self,
+        data: dict,
+        body: Any = {},
+        code: int = status.HTTP_200_OK,
+        message: Union[int, str] = "",
+    ) -> dict:
         data.update({"body": body})
         data.update({"status": {"message": str(message), "code": code}})
         return data
@@ -125,9 +139,13 @@ class BaseChain(AbstractChain):
         try:
             self.validate(data, PreMessage)
         except SchemaError as e:
-            logger.error("%s: handle(data): Error: %s" % (self.__class__.__name__, e))
-            return self.form_response(MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e)
-        logger.debug("%s: handle(data): Successful validation" % self.__class__.__name__)
+            logger.error(f"{self.__class__.__name__}: handle(data): Error: {e}")
+            return self.form_response(
+                MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
+            )
+        logger.debug(
+            "%s: handle(data): Successful validation" % self.__class__.__name__
+        )
         response = {}
         if data["request_type"] == self.request_type:
             response["request_id"] = data["request_id"]
@@ -139,13 +157,15 @@ class BaseChain(AbstractChain):
                 % (self.__class__.__name__, data)
             )
             response.update(self.get_response_header(data))
-            logger.info("%s: handle(data) response=%s" % (self.__class__.__name__, response))
+            logger.info(f"{self.__class__.__name__}: handle(data) response={response}")
             try:
                 self.validate(response, PostMessage)
                 return response
             except SchemaError as e:
-                logger.error("%s: handle(data): Error: %s" % (self.__class__.__name__, e))
-                return self.form_response(MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e)
+                logger.error(f"{self.__class__.__name__}: handle(data): Error: {e}")
+                return self.form_response(
+                    MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
+                )
         else:
             return await super().handle(data)
 
@@ -164,8 +184,16 @@ class BaseChain(AbstractChain):
         """
         return {"header": {"src": data["header"]["dst"], "dst": data["header"]["src"]}}
 
-    def validate(self, data: dict[str, Union[str, dict[str, str]]], schema: Schema) -> None:
-        logger.debug("%s.validate(data, schema): Started validation" % self.__class__.__name__)
-        logger.debug("%s.validate(data, schema): data=%s" % (self.__class__.__name__, data))
-        logger.debug("%s.validate(data, schema): schema%s" % (self.__class__.__name__, schema.__class__.__name__))
+    def validate(
+        self, data: dict[str, Union[str, dict[str, str]]], schema: Schema
+    ) -> None:
+        logger.debug(
+            "%s.validate(data, schema): Started validation" % self.__class__.__name__
+        )
+        logger.debug(f"{self.__class__.__name__}.validate(data, schema): data={data}")
+        logger.debug(
+            "{}.validate(data, schema): schema{}".format(
+                self.__class__.__name__, schema.__class__.__name__
+            )
+        )
         schema.validate(data)
