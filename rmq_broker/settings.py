@@ -15,7 +15,7 @@ for path in paths:
         pass
     else:
         break
-    
+
 if settings == "":
     raise AttributeError(
         "Specified microservice settings file path is not correct! Error: %s"
