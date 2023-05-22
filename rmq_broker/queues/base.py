@@ -1,9 +1,12 @@
+import logging
 from abc import ABC, abstractmethod
 
 from rmq_broker.settings import settings
 
+logger = logging.getLogger(__name__)
 
-class AbstractMessageQueue(ABC):
+
+class AsyncAbstractMessageQueue(ABC):
     MessageQueue: str = ""
 
     def __init__(self):
@@ -11,37 +14,28 @@ class AbstractMessageQueue(ABC):
         if self.MessageQueue == "":
             raise AttributeError("Broker name has not been set.")
         self.config = settings.CONSUMERS.get(self.MessageQueue)
-        self.host = self.config["host"]
-        self.port = self.config["port"]
-        self.broker_login = self.config["broker_login"]
-        self.broker_pwd = self.config["broker_pwd"]
+        self.broker_url = self.config["broker_url"]
+        self.connection = None
+        self.client_properties = None
+        self.rpc = None
+        logger.debug("%s: Initialized" % self.__class__.__name__)
 
     @abstractmethod
-    def post_message(self, body, queue_name):
-        """Отправляет сообщение в очередь."""
+    async def __aenter__(self):
         pass
 
     @abstractmethod
-    def consume(self):
-        """Включает прослушку сообщений из очереди."""
+    async def __aexit__(self, *args, **kwargs):
         pass
 
     @abstractmethod
-    def callback(self):
-        """
-        Пропускает сообщение через фильтры и обработчики,
-        после чего принимает либо отвергает его.
-        """
+    async def register_tasks(self, routing_key, worker):
         pass
 
     @abstractmethod
-    def process_request(self, request, method):
+    async def consume(self):
         pass
 
     @abstractmethod
-    def __enter__(self):
-        pass
-
-    @abstractmethod
-    def __exit__(self, *args, **kwargs):
+    async def post_message(self):
         pass

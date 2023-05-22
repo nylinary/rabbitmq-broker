@@ -43,7 +43,7 @@ class AbstractChain(ABC):
         self._last_chain = chain
 
     @abstractmethod
-    def handle(
+    async def handle(
         self, data: dict[str, Union[str, dict[str, str]]]
     ) -> Union[Callable, None]:
         """
@@ -57,7 +57,7 @@ class AbstractChain(ABC):
             Обработанный запрос: если следующий обработчик определен.
         """
         if hasattr(self, "_next_chain"):
-            return self._next_chain.handle(data)
+            return await self._next_chain.handle(data)
         return self.form_response(
             MessageTemplate,
             {},
@@ -78,7 +78,7 @@ class AbstractChain(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    def get_response_body(
+    async def get_response_body(
         self, data: dict[str, Union[str, dict[str, str]]]
     ) -> dict[str, Union[str, dict[str, str]]]:
         """
@@ -121,7 +121,7 @@ class BaseChain(AbstractChain):
 
     request_type: str = ""
 
-    def handle(self, data):
+    async def handle(self, data):
         """
         Обрабатывает запрос, пропуская его через методы обработки
         заголовка и тела запроса.
@@ -151,7 +151,7 @@ class BaseChain(AbstractChain):
             response["request_id"] = data["request_id"]
             response["request_type"] = data["request_type"]
             logger.info("%s: get_response_body(data)" % self.__class__.__name__)
-            response.update(self.get_response_body(data))
+            response.update(await self.get_response_body(data))
             logger.info(
                 "%s: get_response_header(data) data=%s"
                 % (self.__class__.__name__, data)
@@ -167,7 +167,7 @@ class BaseChain(AbstractChain):
                     MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
                 )
         else:
-            return super().handle(data)
+            return await super().handle(data)
 
     def get_response_header(self, data):
         """

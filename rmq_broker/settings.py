@@ -3,11 +3,21 @@ import importlib
 import environ
 
 env = environ.Env()
-settings_path = env("MICROSERVICE_SETTINGS", default="settings")
+default_path = env("MICROSERVICE_SETTINGS", default="settings")
+paths = [default_path, "config.settings.base", "app.settings", "settings"]
+settings = ""
 
-try:
-    settings = importlib.import_module(settings_path)
-except ModuleNotFoundError as e:
+
+for path in paths:
+    try:
+        settings = importlib.import_module(path)
+    except ModuleNotFoundError:
+        pass
+    else:
+        break
+
+if settings == "":
     raise AttributeError(
-        "Specified microservice settings file path is not correct! Error: %s" % e
+        "Specified microservice settings file path is not correct! Error: %s"
+        % default_path
     )
