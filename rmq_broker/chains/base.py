@@ -151,7 +151,12 @@ class BaseChain(AbstractChain):
             response["request_id"] = data["request_id"]
             response["request_type"] = data["request_type"]
             logger.info("%s: get_response_body(data)" % self.__class__.__name__)
-            response.update(self.get_response_body(data))
+            try:
+                response.update(self.get_response_body(data))
+            except Exception as e:
+                return self.form_response(
+                    MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
+                )
             logger.info(
                 "%s: get_response_header(data) data=%s"
                 % (self.__class__.__name__, data)

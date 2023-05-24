@@ -4,7 +4,7 @@
 [![](https://img.shields.io/badge/-FastAPI-green)](https://fastapi.tiangolo.com/)
 [![Black code style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 [![Isort imports](https://img.shields.io/badge/imports-isort-31674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
-![coverage](http://192.168.32.52/gazprom-asez/webportal-logic/badges/develop/coverage.svg) 
+![coverage](http://192.168.32.52/gazprom-asez/webportal-logic/badges/develop/coverage.svg)
 
 Не зависящий от фреймворков пакет для общения между микросервисами. Пакет предоставляет интерфейс для работы с брокером сообщений `RabbitMQ` и базовый класс цепочки обработчиков.
 
@@ -39,16 +39,16 @@ class LoginChain(BaseChain):
 Также, можно унаследоваться от асинхронного варианта реализации:
 ```
 from rmq_broker.async_chains.base import BaseChain
-    
-    
+
+
 class LoginChain(BaseChain):
     request_type = "login"
-    
+
     async def get_response_body(self, data: dict) -> dict:
         ...
 ```
 
-Метод должен содержать логику обработки запроса и вызывать родительский метод 
+Метод должен содержать логику обработки запроса и вызывать родительский метод
 `BaseChain.form_response(data, body, code, message)`
 ```
 class LoginChain(BaseChain):
