@@ -12,5 +12,5 @@ build:
   tags:
     - dev-runner
   script:
-    - pip install twine
+    - pip install twine poetry
     - poetry build
