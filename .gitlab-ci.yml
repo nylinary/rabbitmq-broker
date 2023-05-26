@@ -12,4 +12,5 @@ build:
   tags:
     - dev-runner
   script:
+    - pip install twine
     - python -m build
