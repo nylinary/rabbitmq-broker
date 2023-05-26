@@ -1,0 +1,15 @@
+include:
+  - project: gazprom-asez/pipelines
+    ref: main
+    file: python/flake8.yaml
+stages:
+  - lint
+  - build
+  - test
+  - upload
+build:
+  stage: build
+  tags:
+    - dev-runner
+  script:
+    - python -m build
