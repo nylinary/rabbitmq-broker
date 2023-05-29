@@ -18,3 +18,18 @@ build:
     - python3 -m build
     - ls -lah
     - ls -lah dist
+    - |
+      cat <<EOT >> .pypirc
+      [distutils]
+      index-servers =
+          rabbitmq-broker
+      [rabbitmq-broker]
+          repository: https://pypi.org/
+          username: ${PYPI_USERNAME}
+          password: ${PYPI_PASSWORD}
+      EOT
+    - cat .pypirc
+    - python -m twine upload --repository rabbitmq-broker dist/rabbitmq_broker-${CI_COMMIT_TAG}-py3-none-any.whl --config-file .pypirc
+  only:
+    - tags
+
