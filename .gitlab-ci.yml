@@ -24,7 +24,7 @@ build:
       index-servers =
           rabbitmq-broker
       [rabbitmq-broker]
-          repository: https://pypi.org/project/rabbitmq-broker/
+          repository: https://upload.pypi.org/legacy/
           username: ${PYPI_USERNAME}
           password: ${PYPI_PASSWORD}
       EOT
