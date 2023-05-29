@@ -14,7 +14,8 @@ build:
   script:
     - pip install twine poetry
     - pip install -r requirements.txt
-    #- poetry build
+    # Замена версии в файле pyproject.toml
+    - sed -i '/version/s/".*"/"'${CI_COMMIT_TAG}'"/' pyproject.toml
     - python3 -m build
     - ls -lah
     - ls -lah dist
@@ -29,6 +30,8 @@ build:
           password: ${PYPI_PASSWORD}
       EOT
     - cat .pypirc
+    # https://medium.com/maisonsdumonde/gitlab-ci-cd-and-gitlab-pypi-repository-4916a51d22eb
+    # https://docs.gitlab.com/ee/user/packages/pypi_repository/
     - python -m twine upload --repository rabbitmq-broker dist/rabbitmq_broker-${CI_COMMIT_TAG}-py3-none-any.whl --config-file .pypirc
   only:
     - tags
