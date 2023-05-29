@@ -24,7 +24,7 @@ upload:
     - dev-runner
   script:
     # Формируем файл .pypirc со сведениями для загрузки проекта на https://pypi.org/manage/project/rabbitmq-broker/releases/
-      - |
+    - |
       cat <<EOT >> .pypirc
       [distutils]
       index-servers =
