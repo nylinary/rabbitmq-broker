@@ -18,11 +18,6 @@ build:
     - python3 -m build
     - ls -lah
     - ls -lah dist
-upload:
-  stage: upload
-  tags:
-    - dev-runner
-  script:
     # Формируем файл .pypirc со сведениями для загрузки проекта на https://pypi.org/manage/project/rabbitmq-broker/releases/
     - |
       cat <<EOT >> .pypirc
