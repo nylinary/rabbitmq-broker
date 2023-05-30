@@ -5,7 +5,7 @@ from typing import Any, Callable, Union
 from schema import Schema, SchemaError
 from starlette import status
 
-from rmq_broker.schemas import MessageTemplate, PostMessage, PreMessage
+from rmq_broker.schemas import BrokerMessage, MessageTemplate, PostMessage, PreMessage
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +35,7 @@ class AbstractChain(ABC):
         self.chains[chain.request_type] = chain
 
     @abstractmethod
-    async def handle(
-        self, data: dict[str, Union[str, dict[str, str]]]
-    ) -> Union[Callable, None]:
+    async def handle(self, data: BrokerMessage) -> Union[Callable, None]:
         """
         Вызывает метод handle() у следующего обработчика в цепочке.
 
@@ -51,9 +49,7 @@ class AbstractChain(ABC):
         ...
 
     @abstractmethod
-    def get_response_header(
-        self, data: dict[str, Union[str, dict[str, str]]]
-    ) -> dict[str, dict[str, str]]:
+    def get_response_header(self, data: BrokerMessage) -> dict:
         """
         Изменяет заголовок запроса.
 
@@ -63,9 +59,7 @@ class AbstractChain(ABC):
         ...  # pragma: no cover
 
     @abstractmethod
-    async def get_response_body(
-        self, data: dict[str, Union[str, dict[str, str]]]
-    ) -> dict[str, Union[str, dict[str, str]]]:
+    async def get_response_body(self, data: BrokerMessage) -> BrokerMessage:
         """
         Изменяет тело запроса.
 
@@ -78,7 +72,7 @@ class AbstractChain(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    def validate(self, data: dict[str, Union[str, dict[str, str]]]) -> None:
+    def validate(self, data: BrokerMessage) -> None:
         pass  # pragma: no cover
 
     def form_response(
@@ -87,7 +81,7 @@ class AbstractChain(ABC):
         body: Any = {},
         code: int = status.HTTP_200_OK,
         message: Union[int, str] = "",
-    ) -> dict:
+    ) -> BrokerMessage:
         data.update({"body": body})
         data.update({"status": {"message": str(message), "code": code}})
         return data
@@ -195,9 +189,12 @@ class BaseChain(AbstractChain):
 
 
 class ChainManager(BaseChain):
+    """Единая точка для распределения запросов по обработчикам."""
+
     chains = {}
 
-    def __init__(self, parent_chain=BaseChain) -> None:
+    def __init__(self, parent_chain: BaseChain = BaseChain) -> None:
+        """Собирает все обработчики в словарь."""
         if subclasses := parent_chain.__subclasses__():
             for subclass in subclasses:
                 if subclass.request_type:
@@ -205,14 +202,22 @@ class ChainManager(BaseChain):
                 self.__init__(subclass)
 
     async def handle(self, data):
-        if chain := self.chains.get(data["request_type"]):
+        """Направляет запрос на нужный обработчик."""
+        try:
+            self.validate(data, PreMessage)
+            chain = self.chains.get(data["request_type"])
             return await chain().handle(data)
-        else:
+        except SchemaError as e:
+            msg = f"Incoming message validation error: {e}"
+        except KeyError as e:
+            msg = f"Can't handle this request type: {e}"
+        finally:
+            logger.error(f"{self.__class__.__name__}: handle(data): {msg}")
             return self.form_response(
                 MessageTemplate,
                 {},
                 status.HTTP_400_BAD_REQUEST,
-                "Can't handle this request type",
+                msg,
             )
 
     async def get_response_body(self, data):

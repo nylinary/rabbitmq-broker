@@ -1,4 +1,9 @@
+from typing import Any, Union
+
 from schema import Optional, Or, Schema
+from typing_extensions import TypeAlias
+
+BrokerMessage: TypeAlias = dict[str, Union[str, dict[str, Any]]]
 
 PreMessage = Schema(
     {

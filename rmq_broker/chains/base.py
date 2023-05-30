@@ -4,11 +4,9 @@ from typing import Any, Callable, Union
 
 from schema import Schema, SchemaError
 from starlette import status
-from typing_extensions import TypeAlias
 
-from rmq_broker.schemas import MessageTemplate, PostMessage, PreMessage
+from rmq_broker.schemas import BrokerMessage, MessageTemplate, PostMessage, PreMessage
 
-BrokerMessage: TypeAlias = dict[str, Union[str, dict[str, Any]]]
 logger = logging.getLogger(__name__)
 
 
@@ -49,7 +47,7 @@ class AbstractChain(ABC):
         """
 
     @abstractmethod
-    def get_response_header(self, data: BrokerMessage) -> BrokerMessage:
+    def get_response_header(self, data: BrokerMessage) -> dict:
         """
         Изменяет заголовок запроса.
 
@@ -173,9 +171,7 @@ class BaseChain(AbstractChain):
         """
         return {"header": {"src": data["header"]["dst"], "dst": data["header"]["src"]}}
 
-    def validate(
-        self, data: dict[str, Union[str, dict[str, str]]], schema: Schema
-    ) -> None:
+    def validate(self, data: BrokerMessage, schema: Schema) -> None:
         logger.debug(
             "%s.validate(data, schema): Started validation" % self.__class__.__name__
         )
