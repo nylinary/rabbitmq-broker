@@ -16,19 +16,11 @@ class AbstractChain(ABC):
     Args:
         ABC : Вспомогательный класс, предоставляющий стандартный способ
               создания абстрактного класса.
-
-    Attributes:
-        _next_chain: Экземпляр обработчика, являющийся следующим
-                     для данного обработчика.
-        _last_chain: Экземпляр обработчика, являющийся последним в цепочке,
-                     начинающейся с данного обработчика.
+    Arguments:
+        chains (dict): {request_type:объект чейна}
     """
 
-    def __init__(self) -> None:
-        """Создает необходимые атрибуты для объекта цепочки."""
-        logger.debug("%s: initialized" % self.__class__.__name__)
-        self._next_chain: AbstractChain
-        self._last_chain: AbstractChain = self
+    chains: dict = {}
 
     def add(self, chain) -> None:
         """
@@ -39,8 +31,7 @@ class AbstractChain(ABC):
         Returns:
             None
         """
-        self._last_chain._next_chain = chain
-        self._last_chain = chain
+        self.chains[chain.request_type] = chain
 
     @abstractmethod
     def handle(
@@ -56,14 +47,6 @@ class AbstractChain(ABC):
             None: если следующий обработчик не определен.
             Обработанный запрос: если следующий обработчик определен.
         """
-        if hasattr(self, "_next_chain"):
-            return self._next_chain.handle(data)
-        return self.form_response(
-            MessageTemplate,
-            {},
-            status.HTTP_400_BAD_REQUEST,
-            "Can't handle this request type",
-        )
 
     @abstractmethod
     def get_response_header(
@@ -147,7 +130,7 @@ class BaseChain(AbstractChain):
             "%s: handle(data): Successful validation" % self.__class__.__name__
         )
         response = {}
-        if data["request_type"] == self.request_type:
+        if self.request_type == data["request_type"]:
             response["request_id"] = data["request_id"]
             response["request_type"] = data["request_type"]
             logger.info("%s: get_response_body(data)" % self.__class__.__name__)
@@ -172,7 +155,12 @@ class BaseChain(AbstractChain):
                     MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
                 )
         else:
-            return super().handle(data)
+            return self.form_response(
+                MessageTemplate,
+                {},
+                status.HTTP_400_BAD_REQUEST,
+                "Can't handle this request type",
+            )
 
     def get_response_header(self, data):
         """
@@ -202,3 +190,28 @@ class BaseChain(AbstractChain):
             )
         )
         schema.validate(data)
+
+
+class ChainManager(BaseChain):
+    chains = {}
+
+    def __init__(self, parent_chain=BaseChain) -> None:
+        if subclasses := parent_chain.__subclasses__():
+            for subclass in subclasses:
+                if subclass.request_type:
+                    self.chains[subclass.request_type] = subclass
+                self.__init__(subclass)
+
+    def handle(self, data):
+        if chain := self.chains.get(data["request_type"]):
+            return chain().handle(data)
+        else:
+            return self.form_response(
+                MessageTemplate,
+                {},
+                status.HTTP_400_BAD_REQUEST,
+                "Can't handle this request type",
+            )
+
+    def get_response_body(self, data):
+        pass
