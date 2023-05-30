@@ -207,14 +207,13 @@ class ChainManager(BaseChain):
             msg = f"Incoming message validation error: {e}"
         except KeyError as e:
             msg = f"Can't handle this request type: {e}"
-        finally:
-            logger.error(f"{self.__class__.__name__}: handle(data): {msg}")
-            return self.form_response(
-                MessageTemplate,
-                {},
-                status.HTTP_400_BAD_REQUEST,
-                msg,
-            )
+        logger.error(f"{self.__class__.__name__}: handle(data): {msg}")
+        return self.form_response(
+            MessageTemplate,
+            {},
+            status.HTTP_400_BAD_REQUEST,
+            msg,
+        )
 
     def get_response_body(self, data):
         pass
