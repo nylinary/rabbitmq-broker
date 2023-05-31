@@ -1,11 +1,17 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Union
 
 from schema import Schema, SchemaError
 from starlette import status
 
-from rmq_broker.schemas import BrokerMessage, MessageTemplate, PostMessage, PreMessage
+from rmq_broker.schemas import (
+    IncomingMessage,
+    MessageHeader,
+    MessageTemplate,
+    OutgoingMessage,
+    PostMessage,
+    PreMessage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +28,7 @@ class AbstractChain(ABC):
 
     chains: dict = {}
 
-    def add(self, chain) -> None:
+    def add(self, chain: object) -> None:
         """
         Добавляет нового обработчика в цепочку.
         Args:
@@ -34,7 +40,7 @@ class AbstractChain(ABC):
         self.chains[chain.request_type] = chain
 
     @abstractmethod
-    def handle(self, data: BrokerMessage) -> Union[Callable, None]:
+    def handle(self, data: IncomingMessage) -> OutgoingMessage:
         """
         Вызывает метод handle() у следующего обработчика в цепочке.
 
@@ -47,7 +53,7 @@ class AbstractChain(ABC):
         """
 
     @abstractmethod
-    def get_response_header(self, data: BrokerMessage) -> dict:
+    def get_response_header(self, data: IncomingMessage) -> MessageHeader:
         """
         Изменяет заголовок запроса.
 
@@ -57,7 +63,7 @@ class AbstractChain(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    def get_response_body(self, data: BrokerMessage) -> BrokerMessage:
+    def get_response_body(self, data: IncomingMessage) -> OutgoingMessage:
         """
         Изменяет тело запроса.
 
@@ -70,16 +76,16 @@ class AbstractChain(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    def validate(self, data: BrokerMessage) -> None:
+    def validate(self, data: IncomingMessage) -> None:
         pass  # pragma: no cover
 
     def form_response(
         self,
-        data: dict,
-        body: Any = {},
+        data: IncomingMessage,
+        body: dict = {},
         code: int = status.HTTP_200_OK,
-        message: Union[int, str] = "",
-    ) -> BrokerMessage:
+        message: str = "",
+    ) -> OutgoingMessage:
         data.update({"body": body})
         data.update({"status": {"message": str(message), "code": code}})
         return data
@@ -98,7 +104,7 @@ class BaseChain(AbstractChain):
 
     request_type: str = ""
 
-    def handle(self, data):
+    def handle(self, data: IncomingMessage) -> OutgoingMessage:
         """
         Обрабатывает запрос, пропуская его через методы обработки
         заголовка и тела запроса.
@@ -156,7 +162,7 @@ class BaseChain(AbstractChain):
                 "Can't handle this request type",
             )
 
-    def get_response_header(self, data):
+    def get_response_header(self, data: IncomingMessage) -> MessageHeader:
         """
         Меняет местами получателя('dst') и отправителя('src') запроса.
 
@@ -171,7 +177,7 @@ class BaseChain(AbstractChain):
         """
         return {"header": {"src": data["header"]["dst"], "dst": data["header"]["src"]}}
 
-    def validate(self, data: BrokerMessage, schema: Schema) -> None:
+    def validate(self, data: IncomingMessage, schema: Schema) -> None:
         logger.debug(
             "%s.validate(data, schema): Started validation" % self.__class__.__name__
         )
@@ -197,7 +203,7 @@ class ChainManager(BaseChain):
                     self.chains[subclass.request_type] = subclass
                 self.__init__(subclass)
 
-    def handle(self, data):
+    def handle(self, data: IncomingMessage) -> OutgoingMessage:
         """Направляет запрос на нужный обработчик."""
         try:
             self.validate(data, PreMessage)

@@ -1,9 +1,32 @@
-from typing import Any, Union
+from typing import NotRequired, TypedDict
 
 from schema import Optional, Or, Schema
-from typing_extensions import TypeAlias
 
-BrokerMessage: TypeAlias = dict[str, Union[str, dict[str, Any]]]
+
+class MessageHeader(TypedDict):
+    dst: str
+    src: str
+
+
+class MessageStatus(TypedDict):
+    code: int
+    message: str
+
+
+class BrokerMessage(TypedDict):
+    request_type: str
+    request_id: str
+    header: MessageHeader
+    body: dict
+
+
+class IncomingMessage(BrokerMessage):
+    status: NotRequired[MessageStatus]
+
+
+class OutgoingMessage(BrokerMessage):
+    status: MessageStatus
+
 
 PreMessage = Schema(
     {
