@@ -1,12 +1,13 @@
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
-from schema import Schema, SchemaError
+from schema import SchemaError
 from starlette import status
 
+from rmq_broker.async_chains.base import BaseChain as AsyncBaseChain
+from rmq_broker.async_chains.base import ChainManager as AsyncChainManager
 from rmq_broker.schemas import (
     IncomingMessage,
-    MessageHeader,
     MessageTemplate,
     OutgoingMessage,
     PostMessage,
@@ -16,101 +17,8 @@ from rmq_broker.schemas import (
 logger = logging.getLogger(__name__)
 
 
-class AbstractChain(ABC):
-    """Интерфейс классов обработчиков.
-
-    Args:
-        ABC : Вспомогательный класс, предоставляющий стандартный способ
-              создания абстрактного класса.
-
-    Arguments:
-        chains (dict): {request_type:объект чейна}
-    """
-
-    chains: dict = {}
-
-    def add(self, chain: object) -> None:
-        """
-        Добавляет нового обработчика в цепочку.
-        Args:
-            chain: Экземпляр обработчика.
-
-        Returns:
-            None
-        """
-        self.chains[chain.request_type] = chain
-        logger.debug(
-            f"{self.__class__.__name__}.add(): {chain.__class__.__name__} added to chains."
-        )
-
-    @abstractmethod
-    def handle(self, data: IncomingMessage) -> OutgoingMessage:
-        """
-        Вызывает метод handle() у следующего обработчика в цепочке.
-
-        Args:
-            data (dict): Словарь с запросом.
-
-        Returns:
-            None: если следующий обработчик не определен.
-            Обработанный запрос: если следующий обработчик определен.
-        """
-        ...
-
-    @abstractmethod
-    def get_response_header(self, data: IncomingMessage) -> MessageHeader:
-        """
-        Изменяет заголовок запроса.
-
-        Args:
-            data (dict): Словарь с запросом.
-        """
-        ...  # pragma: no cover
-
-    @abstractmethod
-    def get_response_body(self, data: IncomingMessage) -> OutgoingMessage:
-        """
-        Изменяет тело запроса.
-
-        Args:
-            data (dict): Словарь с запросом.
-
-        Returns:
-            Cловарь c ответом.
-        """
-        ...  # pragma: no cover
-
-    @abstractmethod
-    def validate(self, data: IncomingMessage) -> None:
-        ...  # pragma: no cover
-
-    def form_response(
-        self,
-        data: IncomingMessage,
-        body: dict = {},
-        code: int = status.HTTP_200_OK,
-        message: str = "",
-    ) -> OutgoingMessage:
-        data.update({"body": body})
-        data.update({"status": {"message": str(message), "code": code}})
-        logger.debug(
-            f"{self.__class__.__name__}.form_response(): Formed response {data=}"
-        )
-        return data
-
-
-class BaseChain(AbstractChain):
-    """
-    Базовый классов обработчиков.
-
-    Args:
-        AbstractChain : Интерфейс классов обработчиков.
-
-    Attributes:
-        request_type (str): Тип запроса, который обработчик способен обработать.
-    """
-
-    request_type: str = ""
+class BaseChain(AsyncBaseChain):
+    """Синхронная версия базового класса обработчика."""
 
     def handle(self, data: IncomingMessage) -> OutgoingMessage:
         """
@@ -169,48 +77,13 @@ class BaseChain(AbstractChain):
                 "Can't handle this request type",
             )
 
-    def get_response_header(self, data: IncomingMessage) -> MessageHeader:
-        """
-        Меняет местами получателя('dst') и отправителя('src') запроса.
-
-        Args:
-            data (dict): Словарь с запросом.
-
-        Returns:
-            Словарь заголовка запроса.
-        """
-        updated_header = {
-            "header": {"src": data["header"]["dst"], "dst": data["header"]["src"]}
-        }
-        logger.debug(
-            f"{self.__class__.__name__}.get_response_header(): {updated_header=}"
-        )
-        return updated_header
-
-    def validate(self, message: IncomingMessage, schema: Schema) -> None:
-        """Валидирует сообщение по переданной схеме.
-
-        Raises:
-            SchemaError: Валидация не была пройдена.
-        """
-        schema.validate(message)
-        logger.debug(
-            f"{self.__class__.__name__}.validate(): Successful validation, {message=}"
-        )
+    @abstractmethod
+    def get_response_body(self, data: IncomingMessage) -> OutgoingMessage:
+        ...
 
 
-class ChainManager(BaseChain):
-    """Единая точка для распределения запросов по обработчикам."""
-
-    chains = {}
-
-    def __init__(self, parent_chain: BaseChain = BaseChain) -> None:
-        """Собирает все обработчики в словарь."""
-        if subclasses := parent_chain.__subclasses__():
-            for subclass in subclasses:
-                if subclass.request_type:
-                    self.chains[subclass.request_type] = subclass
-                self.__init__(subclass)
+class ChainManager(AsyncChainManager):
+    """Синхронная версия менеджера распределения запросов."""
 
     def handle(self, data: IncomingMessage) -> OutgoingMessage:
         """Направляет запрос на нужный обработчик."""
