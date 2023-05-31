@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Callable, Union
 
 from schema import Schema, SchemaError
 from starlette import status
@@ -24,7 +23,7 @@ class AbstractChain(ABC):
         ABC : Вспомогательный класс, предоставляющий стандартный способ
               создания абстрактного класса.
 
-    Attributes:
+    Arguments:
         chains (dict): {request_type:объект чейна}
     """
 
@@ -40,9 +39,12 @@ class AbstractChain(ABC):
             None
         """
         self.chains[chain.request_type] = chain
+        logger.debug(
+            f"{self.__class__.__name__}.add(): {chain.__class__.__name__} added to chains."
+        )
 
     @abstractmethod
-    async def handle(self, data: IncomingMessage) -> Union[Callable, None]:
+    async def handle(self, data: IncomingMessage) -> OutgoingMessage:
         """
         Вызывает метод handle() у следующего обработчика в цепочке.
 
@@ -76,11 +78,11 @@ class AbstractChain(ABC):
         Returns:
             Cловарь c ответом.
         """
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     @abstractmethod
     def validate(self, data: IncomingMessage) -> None:
-        pass  # pragma: no cover
+        ...  # pragma: no cover
 
     def form_response(
         self,
@@ -91,6 +93,9 @@ class AbstractChain(ABC):
     ) -> OutgoingMessage:
         data.update({"body": body})
         data.update({"status": {"message": str(message), "code": code}})
+        logger.debug(
+            f"{self.__class__.__name__}.form_response(): Formed response {data=}"
+        )
         return data
 
 
@@ -99,7 +104,7 @@ class BaseChain(AbstractChain):
     Базовый классов обработчиков.
 
     Args:
-        AbstractChain : Интерфейс классов обработчиков.
+        AbstractChain: Интерфейс классов обработчиков.
 
     Attributes:
         request_type (str): Тип запроса, который обработчик способен обработать.
@@ -122,42 +127,41 @@ class BaseChain(AbstractChain):
             Метод handle() у родительского класса: если типы запроса переданного сообщения
             и конкретного экземпляра обработчика отличаются.
         """
+        logger.info(f"{self.__class__.__name__}.get_response_body(): data={data}")
         try:
             self.validate(data, PreMessage)
         except SchemaError as e:
-            logger.error(f"{self.__class__.__name__}: handle(data): Error: {e}")
+            logger.error(f"{self.__class__.__name__}.handle(): SchemaError: {e}")
             return self.form_response(
                 MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
             )
-        logger.debug(
-            "%s: handle(data): Successful validation" % self.__class__.__name__
-        )
         response = {}
         if self.request_type == data["request_type"]:
             response["request_id"] = data["request_id"]
             response["request_type"] = data["request_type"]
-            logger.info("%s: get_response_body(data)" % self.__class__.__name__)
             try:
                 response.update(await self.get_response_body(data))
+                logger.debug(
+                    f"{self.__class__.__name__}.handle(): After body update {response=}"
+                )
             except Exception as e:
                 return self.form_response(
                     MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
                 )
-            logger.info(
-                "%s: get_response_header(data) data=%s"
-                % (self.__class__.__name__, data)
-            )
             response.update(self.get_response_header(data))
-            logger.info(f"{self.__class__.__name__}: handle(data) response={response}")
+            logger.debug(
+                f"{self.__class__.__name__}.handle(): After header update {response=}"
+            )
             try:
                 self.validate(response, PostMessage)
                 return response
             except SchemaError as e:
-                logger.error(f"{self.__class__.__name__}: handle(data): Error: {e}")
+                logger.error(f"{self.__class__.__name__}.handle(): SchemaError: {e}")
                 return self.form_response(
                     MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
                 )
         else:
+            logger.error(f"{self.__class__.__name__}.handle(): Unknown request type.")
             return self.form_response(
                 MessageTemplate,
                 {},
@@ -172,25 +176,27 @@ class BaseChain(AbstractChain):
         Args:
             data (dict): Словарь с запросом.
 
-        Raises:
-            ShemaError: Любой из ключей ('src', 'dst') отсутствует в словаре запроса.
-
         Returns:
             Словарь заголовка запроса.
         """
-        return {"header": {"src": data["header"]["dst"], "dst": data["header"]["src"]}}
+        updated_header = {
+            "header": {"src": data["header"]["dst"], "dst": data["header"]["src"]}
+        }
+        logger.debug(
+            f"{self.__class__.__name__}.get_response_header(): {updated_header=}"
+        )
+        return updated_header
 
-    def validate(self, data: IncomingMessage, schema: Schema) -> None:
+    def validate(self, message: IncomingMessage, schema: Schema) -> None:
+        """Валидирует сообщение по переданной схеме.
+
+        Raises:
+            SchemaError: Валидация не была пройдена.
+        """
+        schema.validate(message)
         logger.debug(
-            "%s.validate(data, schema): Started validation" % self.__class__.__name__
+            f"{self.__class__.__name__}.validate(): Successful validation, {message=}"
         )
-        logger.debug(f"{self.__class__.__name__}.validate(data, schema): data={data}")
-        logger.debug(
-            "{}.validate(data, schema): schema{}".format(
-                self.__class__.__name__, schema.__class__.__name__
-            )
-        )
-        schema.validate(data)
 
 
 class ChainManager(BaseChain):
@@ -216,7 +222,7 @@ class ChainManager(BaseChain):
             msg = f"Incoming message validation error: {e}"
         except KeyError as e:
             msg = f"Can't handle this request type: {e}"
-        logger.error(f"{self.__class__.__name__}: handle(data): {msg}")
+        logger.error(f"{self.__class__.__name__}.handle(): {msg}")
         return self.form_response(
             MessageTemplate,
             {},

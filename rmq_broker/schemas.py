@@ -1,6 +1,7 @@
-from typing import NotRequired, TypedDict
+from typing import TypedDict
 
 from schema import Optional, Or, Schema
+from typing_extensions import NotRequired
 
 
 class MessageHeader(TypedDict):
