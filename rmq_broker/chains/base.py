@@ -69,7 +69,9 @@ class BaseChain(AsyncBaseChain):
                     MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
                 )
         else:
-            logger.error(f"{self.__class__.__name__}.handle(): Unknown request type.")
+            logger.error(
+                f"{self.__class__.__name__}.handle(): Unknown request_type='{data['request_type']}'"
+            )
             return self.form_response(
                 MessageTemplate,
                 {},

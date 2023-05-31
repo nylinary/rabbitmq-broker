@@ -87,10 +87,11 @@ class AbstractChain(ABC):
     def form_response(
         self,
         data: IncomingMessage,
-        body: dict = {},
+        body: dict = None,
         code: int = status.HTTP_200_OK,
         message: str = "",
     ) -> OutgoingMessage:
+        body = {} if body is None else body
         data.update({"body": body})
         data.update({"status": {"message": str(message), "code": code}})
         logger.debug(
@@ -161,7 +162,9 @@ class BaseChain(AbstractChain):
                     MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
                 )
         else:
-            logger.error(f"{self.__class__.__name__}.handle(): Unknown request type.")
+            logger.error(
+                f"{self.__class__.__name__}.handle(): Unknown request_type='{data['request_type']}'"
+            )
             return self.form_response(
                 MessageTemplate,
                 {},
