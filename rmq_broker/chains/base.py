@@ -201,7 +201,7 @@ class ChainManager(BaseChain):
         """Направляет запрос на нужный обработчик."""
         try:
             self.validate(data, PreMessage)
-            chain = self.chains.get(data["request_type"])
+            chain = self.chains[data["request_type"]]
             return chain().handle(data)
         except SchemaError as e:
             msg = f"Incoming message validation error: {e}"
