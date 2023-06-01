@@ -44,7 +44,7 @@ class BaseChain(AsyncBaseChain):
                 MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
             )
         response = {}
-        if self.request_type == data["request_type"]:
+        if self.request_type.lower() == data["request_type"].lower():
             response["request_id"] = data["request_id"]
             response["request_type"] = data["request_type"]
             try:
@@ -91,7 +91,7 @@ class ChainManager(AsyncChainManager):
         """Направляет запрос на нужный обработчик."""
         try:
             self.validate(data, PreMessage)
-            chain = self.chains[data["request_type"]]
+            chain = self.chains[data["request_type"].lower()]
             return chain().handle(data)
         except SchemaError as e:
             msg = f"Incoming message validation error: {e}"
