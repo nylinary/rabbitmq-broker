@@ -38,9 +38,9 @@ class AbstractChain(ABC):
         Returns:
             None
         """
-        self.chains[chain.request_type] = chain
+        self.chains[chain.request_type.lower()] = chain
         logger.debug(
-            f"{self.__class__.__name__}.add(): {chain.__class__.__name__} added to chains."
+            f"{self.__class__.__name__}.add(): {chain.__name__} added to chains."
         )
 
     @abstractmethod
@@ -212,14 +212,14 @@ class ChainManager(BaseChain):
         if subclasses := parent_chain.__subclasses__():
             for subclass in subclasses:
                 if subclass.request_type:
-                    self.chains[subclass.request_type] = subclass
+                    self.add(subclass)
                 self.__init__(subclass)
 
     async def handle(self, data: IncomingMessage) -> OutgoingMessage:
         """Направляет запрос на нужный обработчик."""
         try:
             self.validate(data, PreMessage)
-            chain = self.chains[data["request_type"]]
+            chain = self.chains[data["request_type"].lower()]
             return await chain().handle(data)
         except SchemaError as e:
             msg = f"Incoming message validation error: {e}"
