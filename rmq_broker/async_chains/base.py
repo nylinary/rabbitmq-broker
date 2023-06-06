@@ -12,6 +12,7 @@ from rmq_broker.schemas import (
     PostMessage,
     PreMessage,
 )
+from rmq_broker.utils import Singleton
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +203,7 @@ class BaseChain(AbstractChain):
         )
 
 
-class ChainManager(BaseChain):
+class ChainManager(BaseChain, Singleton):
     """Единая точка для распределения запросов по обработчикам."""
 
     chains = {}
