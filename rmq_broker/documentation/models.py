@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 try:
     from pydantic import AnyUrl, EmailStr, Field
     from pydantic.main import BaseModel
-    from pydantic.networks import email_validator
+    from pydantic.networks import email_validator  # noqa F401
 except ImportError:
     print(
         "Для использования чейна генерации документации необходим пакет pydantic и email-validator"
