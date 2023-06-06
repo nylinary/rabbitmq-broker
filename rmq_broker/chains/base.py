@@ -13,6 +13,7 @@ from rmq_broker.schemas import (
     PostMessage,
     PreMessage,
 )
+from rmq_broker.utils import Singleton
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class BaseChain(AsyncBaseChain):
         ...
 
 
-class ChainManager(AsyncChainManager):
+class ChainManager(AsyncChainManager, Singleton):
     """Синхронная версия менеджера распределения запросов."""
 
     def handle(self, data: IncomingMessage) -> OutgoingMessage:
