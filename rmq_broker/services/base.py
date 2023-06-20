@@ -30,32 +30,21 @@ class AbstractService(ABC):
     async def send_rpc_request(self, message: IncomingMessage) -> OutgoingMessage:
         ...
 
-    @abstractmethod
-    async def _connect(self) -> None:
-        ...
-
-    @abstractmethod
-    async def _close_connection(self) -> None:
-        ...
-
 
 class BaseService(AbstractService):
     """Отправка сообщений в сервисы."""
 
+    broker_name = "rabbitmq"
+    config = settings.CONSUMERS.get(broker_name)
+    broker_url = config["broker_url"]
+    service_name = settings.SERVICE_NAME
+
     def __init__(self):
         """Создает необходимые атрибуты для подключения к брокеру сообщений."""
-        for attr in (self.broker_name, self.dst_service_name):
-            if not attr:
-                raise AttributeError(
-                    f"Attribute {attr} has not been set for class {self.__class__.__name__}"
-                )
-        self.config = settings.CONSUMERS.get(self.MessageQueue)
-        self.service_name = settings.SERVICE_NAME
-        self.broker_url = self.config["broker_url"]
-        self.connection = None
-        self.client_properties = None
-        self.rpc = None
-        logger.debug("%s: Initialized" % self.__class__.__name__)
+        if not self.dst_service_name:
+            raise AttributeError(
+                f"Attribute `dst_service_name` has not been set for class {self.__class__.__name__}"
+            )
 
     async def send_message(self, request_type: str, body: dict) -> OutgoingMessage:
         """Генерирует уникальный id запроса и вызывает отправку сформированного
@@ -85,12 +74,11 @@ class BaseService(AbstractService):
                     self.__class__.__name__, e
                 )
             )
-        if self.connection is None or self.connection.is_closed:
-            await self._connect()
         try:
-            return await self.rpc.call(
-                message["request_type"], kwargs=dict(data=message)
-            )
+            connection = await aio_pika.connect_robust(self.broker_url)
+            async with connection, connection.channel() as channel:
+                rpc = await RPC.create(channel)
+                return await rpc.call(self.dst_service_name, kwargs=dict(data=message))
         except (asyncio.TimeoutError, asyncio.CancelledError, RuntimeError) as err:
             return Message.make_error_msg(
                 message["request_id"],
@@ -99,19 +87,3 @@ class BaseService(AbstractService):
                 self.dst_service_name,
                 str(err),
             )
-
-    async def _connect(self):
-        """Устанавливает соединение с брокером сообщений. Создает канал для
-        отправки сообщений.
-        """
-        logger.info("%s.__aenter__: Created connection" % self.__class__.__name__)
-        self.connection = await aio_pika.connect_robust(
-            self.broker_url,
-        )
-        self.channel = await self.connection.channel()
-        self.rpc = await RPC.create(self.channel)
-
-    async def _close_connection(self):
-        """Закрывает соединение с брокером сообщений."""
-        await self.connection.close()
-        await self.channel.close()

@@ -12,7 +12,7 @@ from rmq_broker.schemas import (
     PostMessage,
     PreMessage,
 )
-from rmq_broker.utils import Singleton
+from rmq_broker.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 
