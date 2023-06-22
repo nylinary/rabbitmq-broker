@@ -1,4 +1,5 @@
 from typing import TypedDict
+from uuid import UUID
 
 from schema import Optional, Or, Schema
 from typing_extensions import NotRequired
@@ -32,7 +33,7 @@ class OutgoingMessage(BrokerMessage):
 PreMessage = Schema(
     {
         "request_type": str,
-        "request_id": str,
+        "request_id": Or(str, UUID),
         "header": {"src": str, "dst": str},
         "body": object,
         Optional("status"): dict,
@@ -43,7 +44,7 @@ PreMessage = Schema(
 PostMessage = Schema(
     {
         "request_type": str,
-        "request_id": str,
+        "request_id": Or(str, UUID),
         "header": {"src": str, "dst": str},
         "body": object,
         "status": {"message": str, "code": Or(int, str)},
