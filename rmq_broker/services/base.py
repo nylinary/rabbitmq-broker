@@ -1,15 +1,14 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from uuid import uuid4
 
 import aio_pika
 from aio_pika.patterns import RPC
 from schema import SchemaError
 
+from rmq_broker import models
 from rmq_broker.schemas import IncomingMessage, OutgoingMessage, PreMessage
 from rmq_broker.settings import settings
-from rmq_broker.utils.message_generation import Message
 
 logger = logging.getLogger(__name__)
 
@@ -50,18 +49,15 @@ class BaseService(AbstractService):
         """Генерирует уникальный id запроса и вызывает отправку сформированного
         сообщения.
         """
-        request_id = uuid4().hex
-        return await self.send_rpc_request(
-            Message.make_request_msg(
-                request_type,
-                body,
-                self.service_name,
-                self.dst_service_name,
-                request_id=request_id,
-            )
+        message = models.IncomingMessage(
+            request_type=request_type,
+            src=self.service_name,
+            dst=self.dst_service_name,
+            body=body,
         )
+        return await self.send_rpc_request(message.dict())
 
-    async def send_rpc_request(self, message: OutgoingMessage) -> IncomingMessage:
+    async def send_rpc_request(self, message: IncomingMessage) -> OutgoingMessage:
         """Валидирует сообщение, создает соединение с брокером и отправляет
         сообщение в очередь.
         В случае ошибки формирует сообщение с данными об ошибке и HTTP кодом 500.
@@ -80,10 +76,10 @@ class BaseService(AbstractService):
                 rpc = await RPC.create(channel)
                 return await rpc.call(self.dst_service_name, kwargs=dict(data=message))
         except (asyncio.TimeoutError, asyncio.CancelledError, RuntimeError) as err:
-            return Message.make_error_msg(
-                message["request_id"],
-                message["request_type"],
-                self.service_name,
-                self.dst_service_name,
-                str(err),
-            )
+            return models.ErrorMessage(
+                request_id=message["request_id"],
+                request_type=message["request_type"],
+                src=self.service_name,
+                dst=self.dst_service_name,
+                message=str(err),
+            ).dict()
