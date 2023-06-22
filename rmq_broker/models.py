@@ -6,7 +6,8 @@ from starlette import status as status_code
 
 
 class BaseMessage(BaseModel):
-    _nest = dict
+    class Config:
+        allow_status: bool = True
 
     def dict(
         self,
@@ -31,11 +32,14 @@ class BaseMessage(BaseModel):
         return self.__post_dict__(data)
 
     def __post_dict__(self, data: dict) -> dict:
-        for field_name in self._nest.keys():
+        nest = {"header": ["dst", "src"], "status": ["message", "code"]}
+        for field_name in nest.keys():
             field = {field_name: {}}
-            for _field_name in self._nest[field_name]:
+            for _field_name in nest[field_name]:
                 field[field_name].update({_field_name: data.pop(_field_name, None)})
             data.update(field)
+        if not self.__config__.allow_status:
+            del data["status"]
         return data
 
 
@@ -48,14 +52,11 @@ class OutgoingMessage(BaseMessage):
     message: str = "OK"
     code: int = status_code.HTTP_200_OK
 
-    _nest = {"header": ["dst", "src"], "status": ["message", "code"]}
-
 
 class IncomingMessage(OutgoingMessage):
     def __init__(self, allow_status: bool = False, **data):
         super().__init__(**data)
-        if not allow_status:
-            del self._nest["status"], self.code, self.message
+        self.__config__.allow_status = allow_status
 
 
 class ErrorMessage(OutgoingMessage):
