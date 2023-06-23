@@ -4,6 +4,7 @@ from abc import abstractmethod
 from schema import SchemaError
 from starlette import status
 
+from rmq_broker import models
 from rmq_broker.async_chains.base import BaseChain as AsyncBaseChain
 from rmq_broker.async_chains.base import ChainManager as AsyncChainManager
 from rmq_broker.schemas import (
@@ -44,10 +45,8 @@ class BaseChain(AsyncBaseChain):
             return self.form_response(
                 MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
             )
-        response = {}
+        response = models.OutgoingMessage().dict()
         if self.request_type.lower() == data["request_type"].lower():
-            response["request_id"] = data["request_id"]
-            response["request_type"] = data["request_type"]
             try:
                 response.update(self.get_response_body(data))
                 logger.debug(
@@ -60,6 +59,12 @@ class BaseChain(AsyncBaseChain):
             response.update(self.get_response_header(data))
             logger.debug(
                 f"{self.__class__.__name__}.handle(): After header update {response=}"
+            )
+            # These field must stay the same.
+            response["request_id"] = data["request_id"]
+            response["request_type"] = data["request_type"]
+            logger.debug(
+                f"{self.__class__.__name__}.handle(): Before sending {response=}"
             )
             try:
                 self.validate(response, PostMessage)

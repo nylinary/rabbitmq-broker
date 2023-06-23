@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from schema import Schema, SchemaError
 from starlette import status
 
+from rmq_broker import models
 from rmq_broker.schemas import (
     IncomingMessage,
     MessageHeader,
@@ -137,10 +138,8 @@ class BaseChain(AbstractChain):
             return self.form_response(
                 MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
             )
-        response = {}
-        if self.request_type == data["request_type"]:
-            response["request_id"] = data["request_id"]
-            response["request_type"] = data["request_type"]
+        response = models.OutgoingMessage().dict()
+        if self.request_type.lower() == data["request_type"].lower():
             try:
                 response.update(await self.get_response_body(data))
                 logger.debug(
@@ -153,6 +152,12 @@ class BaseChain(AbstractChain):
             response.update(self.get_response_header(data))
             logger.debug(
                 f"{self.__class__.__name__}.handle(): After header update {response=}"
+            )
+            # These field must stay the same.
+            response["request_id"] = data["request_id"]
+            response["request_type"] = data["request_type"]
+            logger.debug(
+                f"{self.__class__.__name__}.handle(): Before sending {response=}"
             )
             try:
                 self.validate(response, PostMessage)

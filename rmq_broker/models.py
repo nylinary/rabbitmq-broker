@@ -43,6 +43,22 @@ class BaseMessage(BaseModel):
         return data
 
 
+class MessageStatus(BaseMessage):
+    code: int = status_code.HTTP_200_OK
+    message: str = "OK"
+
+    def __post_dict__(self, data: dict) -> dict:
+        return {"status": data}
+
+
+class MessageHeader(BaseMessage):
+    src: str = ""
+    dst: str = ""
+
+    def __post_dict__(self, data: dict) -> dict:
+        return {"header": data}
+
+
 class OutgoingMessage(BaseMessage):
     request_type: str = ""
     request_id: UUID = Field(default=uuid4().hex)
