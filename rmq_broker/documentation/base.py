@@ -50,7 +50,18 @@ class BaseDocsChain:
             "openapi": self.openapi_version,
             "info": {"title": self.title, "version": self.version},
         }
-        chains = [chain() for chain in chain_manager.chains.values()]
+        chains = []
+        chain_name = {}  # Для записи измененных chain.__name__ .
+
+        for chain in chain_manager.chains.values():
+            if chain.include_in_schema:
+                chains.append(chain())
+                if chain.deprecated:
+                    chain_name[chain] = chain.__name__
+                    chain.__name__ = '\u0336' + '\u0336'.join(chain.__name__) + '\u0336' + ' - устаревший.'
+                    if chain.actual != '':
+                        chain.__name__ = chain.__name__ + " Актуальный " + chain.actual + "."
+
         components: dict = {}
         paths = defaultdict(dict)
 
@@ -71,6 +82,12 @@ class BaseDocsChain:
         output["paths"] = dict(
             sorted(paths.items(), key=lambda i: i[1]["post"]["tags"][0])
         )
+
+        for k, v in chain_name.items():
+            for chain in chain_manager.chains.values():
+                if chain == k:
+                    chain.__name__ = v  # Возврат измененного chain.__name__ .
+
         return OpenAPI(**output).dict(by_alias=True, exclude_none=True)
 
 
