@@ -33,6 +33,6 @@ build:
     # https://medium.com/maisonsdumonde/gitlab-ci-cd-and-gitlab-pypi-repository-4916a51d22eb
     # https://docs.gitlab.com/ee/user/packages/pypi_repository/
     # https://twine.readthedocs.io/en/stable/
-    - python -m twine upload --repository rabbitmq-broker dist/rabbitmq_broker-${CI_COMMIT_TAG}-py3-none-any.whl --config-file .pypirc
+    - python3.9 -m twine upload --repository rabbitmq-broker dist/rabbitmq_broker-${CI_COMMIT_TAG}-py3-none-any.whl --config-file .pypirc
   only:
     - tags
