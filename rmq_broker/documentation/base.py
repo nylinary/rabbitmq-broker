@@ -20,7 +20,6 @@ class BaseDocsChain:
     include_in_schema = False
 
     def make_chain_description(self, chain: BaseChain, model_name_map: dict) -> dict:
-        name = chain.__class__.__name__
         required = getattr(chain, "body_model", None) in model_name_map
         # todo: Обязательность относительно обязательных параметров формы
         operation = {
