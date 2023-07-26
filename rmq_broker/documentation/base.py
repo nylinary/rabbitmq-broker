@@ -20,11 +20,12 @@ class BaseDocsChain:
     include_in_schema = False
 
     def make_chain_description(self, chain: BaseChain, model_name_map: dict) -> dict:
+        name = chain.__class__.__name__
         required = getattr(chain, "body_model", None) in model_name_map
         # todo: Обязательность относительно обязательных параметров формы
         operation = {
             "tags": [f"RPC: {get_class_dir(chain)}"],
-            "summary": "/" + get_class_dir(chain) + "/" + chain.request_type,
+            "summary": name,
             "description": chain.__class__.__doc__,
             "operationId": chain.request_type,
         }
@@ -63,7 +64,7 @@ class BaseDocsChain:
 
         for chain in chains:
             operation = self.make_chain_description(chain, model_name_map)
-            name = operation["summary"]
+            name = "/" + get_class_dir(chain) + "/" + chain.request_type
             paths[name]["post"] = operation
 
         if definitions:
