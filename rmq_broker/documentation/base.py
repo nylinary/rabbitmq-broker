@@ -64,7 +64,7 @@ class BaseDocsChain:
 
         for chain in chains:
             operation = self.make_chain_description(chain, model_name_map)
-            name = operation["summary"]
+            name = "/" + get_class_dir(chain) + "/" + chain.request_type
             paths[name]["post"] = operation
 
         if definitions:
