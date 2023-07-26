@@ -17,6 +17,7 @@ class BaseDocsChain:
     title: str = settings.SERVICE_NAME
     openapi_version: str = "3.0.2"
     version: str = "0.1"
+    include_in_schema = False
 
     def make_chain_description(self, chain: BaseChain, model_name_map: dict) -> dict:
         name = chain.__class__.__name__
