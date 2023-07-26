@@ -76,7 +76,6 @@ class BaseDocsChain:
         output["paths"] = dict(
             sorted(paths.items(), key=lambda i: i[1]["post"]["tags"][0])
         )
-
         return OpenAPI(**output).dict(by_alias=True, exclude_none=True)
 
 
