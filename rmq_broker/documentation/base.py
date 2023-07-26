@@ -25,7 +25,7 @@ class BaseDocsChain:
         # todo: Обязательность относительно обязательных параметров формы
         operation = {
             "tags": [f"RPC: {get_class_dir(chain)}"],
-            "summary": name,
+            "summary": "/" + get_class_dir(chain) + "/" + chain.request_type,
             "description": chain.__class__.__doc__,
             "operationId": chain.request_type,
         }
