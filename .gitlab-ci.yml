@@ -15,7 +15,7 @@ build:
     - pip install -r requirements.txt
     # Замена версии в файле pyproject.toml
     - sed -i '/version/s/".*"/"'${CI_COMMIT_TAG}'"/' pyproject.toml
-    - python -m build
+    - python3 -m build
     - ls -lah
     - ls -lah dist
     # Формируем файл .pypirc со сведениями для загрузки проекта на https://pypi.org/manage/project/rabbitmq-broker/releases/
