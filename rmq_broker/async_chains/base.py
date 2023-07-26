@@ -114,11 +114,14 @@ class BaseChain(AbstractChain):
                                 False - исключить Chain из Swagger документации.
         deprecated (bool): False (значение по умолчанию) - Chain актуален;
                         True - отметить Chain, как устаревший.
+        actual (str): Наименование актуального Chain в Swagger документации. Отображается
+                    рядом с устаревшим Chain (где include_in_schema = True, deprecated = True).
     """
 
     request_type: str = ""
     include_in_schema: bool = True
     deprecated: bool = False
+    actual: str = ""
 
     async def handle(self, data: IncomingMessage) -> OutgoingMessage:
         """
