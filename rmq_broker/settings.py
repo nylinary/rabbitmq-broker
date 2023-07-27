@@ -4,7 +4,7 @@ import environ
 
 env = environ.Env()
 default_path = env("MICROSERVICE_SETTINGS", default="settings")
-paths = [default_path, "config.settings.base", "app.settings", "settings"]
+paths = [default_path, "config.settings.base", "app.settings", "settings", "application.settings"]
 settings = ""
 
 
