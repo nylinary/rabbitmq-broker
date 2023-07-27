@@ -116,6 +116,7 @@ class BaseChain(AbstractChain):
                         True - отметить Chain, как устаревший.
         actual (str): Наименование актуального Chain в Swagger документации. Отображается
                     рядом с устаревшим Chain (где include_in_schema = True, deprecated = True).
+                    Устанавливает deprecated = True автоматически, если deprecated не был указан как True.
     """
 
     request_type: str = ""

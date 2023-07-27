@@ -31,8 +31,9 @@ class BaseDocsChain:
         }
         if chain.deprecated:
             operation['deprecated'] = True
-            if chain.actual:
-                operation['summary'] += ". Актуальный - " + chain.actual + "."
+        if chain.actual:
+            operation['deprecated'] = True
+            operation['summary'] += ". Актуальный - " + chain.actual + "."
         request_body = {
             "required": required,
         }
