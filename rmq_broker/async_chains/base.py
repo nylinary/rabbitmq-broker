@@ -1,18 +1,11 @@
 import logging
 from abc import ABC, abstractmethod
 
-from schema import Schema, SchemaError
+from pydantic.error_wrappers import ValidationError
 from starlette import status
 
 from rmq_broker import models
-from rmq_broker.schemas import (
-    IncomingMessage,
-    MessageHeader,
-    MessageTemplate,
-    OutgoingMessage,
-    PostMessage,
-    PreMessage,
-)
+from rmq_broker.schemas import IncomingMessage, MessageHeader, OutgoingMessage
 from rmq_broker.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
@@ -82,10 +75,6 @@ class AbstractChain(ABC):
         """
         ...  # pragma: no cover
 
-    @abstractmethod
-    def validate(self, data: IncomingMessage) -> None:
-        ...  # pragma: no cover
-
     def form_response(
         self,
         data: IncomingMessage,
@@ -132,23 +121,19 @@ class BaseChain(AbstractChain):
         """
         logger.info(f"{self.__class__.__name__}.get_response_body(): data={data}")
         try:
-            self.validate(data, PreMessage)
-        except SchemaError as e:
-            logger.error(f"{self.__class__.__name__}.handle(): SchemaError: {e}")
-            return self.form_response(
-                MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
-            )
-        response = models.OutgoingMessage().dict()
+            models.IncomingMessage(**data)
+        except ValidationError as error:
+            logger.error(f"{self.__class__.__name__}.handle(): {error}")
+            return models.ErrorMessage().generate(message=str(error))
+        response = models.OutgoingMessage().generate()
         if self.request_type.lower() == data["request_type"].lower():
             try:
                 response.update(await self.get_response_body(data))
                 logger.debug(
                     f"{self.__class__.__name__}.handle(): After body update {response=}"
                 )
-            except Exception as e:
-                return self.form_response(
-                    MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
-                )
+            except Exception as exc:
+                return models.ErrorMessage().generate(message=str(exc))
             response.update(self.get_response_header(data))
             logger.debug(
                 f"{self.__class__.__name__}.handle(): After header update {response=}"
@@ -160,22 +145,19 @@ class BaseChain(AbstractChain):
                 f"{self.__class__.__name__}.handle(): Before sending {response=}"
             )
             try:
-                self.validate(response, PostMessage)
+                models.OutgoingMessage(**response)
                 return response
-            except SchemaError as e:
-                logger.error(f"{self.__class__.__name__}.handle(): SchemaError: {e}")
-                return self.form_response(
-                    MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
+            except ValidationError as error:
+                logger.error(
+                    f"{self.__class__.__name__}.handle(): ValidationError: {error}"
                 )
+                return models.ErrorMessage().generate(message=str(error))
         else:
             logger.error(
                 f"{self.__class__.__name__}.handle(): Unknown request_type='{data['request_type']}'"
             )
-            return self.form_response(
-                MessageTemplate,
-                {},
-                status.HTTP_400_BAD_REQUEST,
-                "Can't handle this request type",
+            return models.ErrorMessage().generate(
+                message="Can't handle this request type"
             )
 
     def get_response_header(self, data: IncomingMessage) -> MessageHeader:
@@ -196,17 +178,6 @@ class BaseChain(AbstractChain):
         )
         return updated_header
 
-    def validate(self, message: IncomingMessage, schema: Schema) -> None:
-        """Валидирует сообщение по переданной схеме.
-
-        Raises:
-            SchemaError: Валидация не была пройдена.
-        """
-        schema.validate(message)
-        logger.debug(
-            f"{self.__class__.__name__}.validate(): Successful validation, {message=}"
-        )
-
 
 class ChainManager(BaseChain, Singleton):
     """Единая точка для распределения запросов по обработчикам."""
@@ -224,20 +195,15 @@ class ChainManager(BaseChain, Singleton):
     async def handle(self, data: IncomingMessage) -> OutgoingMessage:
         """Направляет запрос на нужный обработчик."""
         try:
-            self.validate(data, PreMessage)
+            models.IncomingMessage(**data)
             chain = self.chains[data["request_type"].lower()]
             return await chain().handle(data)
-        except SchemaError as e:
-            msg = f"Incoming message validation error: {e}"
-        except KeyError as e:
-            msg = f"Can't handle this request type: {e}"
+        except ValidationError as error:
+            msg = f"Incoming message validation error: {error}"
+        except KeyError as error:
+            msg = f"Can't handle this request type: {error}"
         logger.error(f"{self.__class__.__name__}.handle(): {msg}")
-        return self.form_response(
-            MessageTemplate,
-            {},
-            status.HTTP_400_BAD_REQUEST,
-            msg,
-        )
+        return models.ErrorMessage().generate(message=msg)
 
     async def get_response_body(self, data):
         pass

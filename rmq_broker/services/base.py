@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 
 import aio_pika
 from aio_pika.patterns import RPC
-from schema import SchemaError
+from pydantic.error_wrappers import ValidationError
 
 from rmq_broker import models
-from rmq_broker.schemas import IncomingMessage, OutgoingMessage, PreMessage
+from rmq_broker.schemas import IncomingMessage, OutgoingMessage
 from rmq_broker.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -49,37 +49,38 @@ class BaseService(AbstractService):
         """Генерирует уникальный id запроса и вызывает отправку сформированного
         сообщения.
         """
-        message = models.IncomingMessage(
+        message = models.IncomingMessage().generate(
             request_type=request_type,
             src=self.service_name,
             dst=self.dst_service_name,
             body=body,
         )
-        return await self.send_rpc_request(message.dict())
+        return await self.send_rpc_request(message)
 
     async def send_rpc_request(self, message: IncomingMessage) -> OutgoingMessage:
         """Валидирует сообщение, создает соединение с брокером и отправляет
         сообщение в очередь.
-        В случае ошибки формирует сообщение с данными об ошибке и HTTP кодом 500.
+        В случае ошибки формирует сообщение с данными об ошибке и HTTP кодом 400.
         """
         try:
-            PreMessage.validate(message)
-        except SchemaError as e:
+            models.IncomingMessage(**message)
+        except ValidationError as error:
             logger.error(
                 "{}.post_message: Message validation failed!: {}".format(
-                    self.__class__.__name__, e
+                    self.__class__.__name__, error
                 )
             )
+            return models.ErrorMessage().generate(message=str(error))
         try:
             connection = await aio_pika.connect_robust(self.broker_url)
             async with connection, connection.channel() as channel:
                 rpc = await RPC.create(channel)
                 return await rpc.call(self.dst_service_name, kwargs=dict(data=message))
         except (asyncio.TimeoutError, asyncio.CancelledError, RuntimeError) as err:
-            return models.ErrorMessage(
+            return models.ErrorMessage().generate(
                 request_id=message["request_id"],
                 request_type=message["request_type"],
                 src=self.service_name,
                 dst=self.dst_service_name,
                 message=str(err),
-            ).dict()
+            )
