@@ -4,12 +4,12 @@ from uuid import UUID
 from typing_extensions import NotRequired
 
 
-class MessageHeader(TypedDict):
+class BrokerMessageHeader(TypedDict):
     dst: str
     src: str
 
 
-class MessageStatus(TypedDict):
+class BrokerMessageStatus(TypedDict):
     code: int
     message: str
 
@@ -17,13 +17,13 @@ class MessageStatus(TypedDict):
 class BrokerMessage(TypedDict):
     request_type: str
     request_id: UUID
-    header: MessageHeader
+    header: BrokerMessageHeader
     body: dict
 
 
-class IncomingMessage(BrokerMessage):
-    status: NotRequired[MessageStatus]
+class UnprocessedBrokerMessage(BrokerMessage):
+    status: NotRequired[BrokerMessageStatus]
 
 
-class OutgoingMessage(BrokerMessage):
-    status: MessageStatus
+class ProcessedBrokerMessage(BrokerMessage):
+    status: BrokerMessageStatus

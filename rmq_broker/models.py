@@ -3,15 +3,15 @@
 
 Валидация сообщения происходит так же, как и в обычной pydantic модели:
 
-    OutgoingMessage(**message_dict)
+    ProcessedMessage(**message_dict)
 
 Для генерации сообщения необходимо создать объект модели, не передавая аргументы
 при инициализации, и вызвать метод generate. В аргументы метода generate можно
 передавать любой из ключей структуры сообщения, в том числе code, message,
-dst и src. Вложенная стукртура(header, status) формируется сама:
+dst и src. Вложенная структура(header, status) формируется сама:
 
-    >>> OutgoingMessage().generate(dst="destination", code=201 request_type="creation")
-    >>> {"header": {"src": "", "dst": "destination"}, request_type: "creation"...}
+    >>> ProcessedMessage().generate(dst="destination", code=201, request_type="creation")
+    >>> {"header": {"src": "", "dst": "destination"}, "request_type": "creation"...}
 """
 
 import inspect
@@ -46,8 +46,6 @@ class BaseMessage(BaseModel):
         """
         if kwargs:
             super().__init__(**kwargs)
-        else:
-            pass
 
     def generate(self, **fields) -> dict:
         """Генерирует сообщение."""
@@ -150,14 +148,14 @@ class ErrorMessage(BaseMessage):
         message = "Error"
 
 
-class OutgoingMessage(BaseMessage):
-    pass
-
-
-class IncomingMessage(BaseMessage):
+class UnprocessedMessage(BaseMessage):
     status: Optional[MessageStatus]
 
     class Config:
         to_exclude = [
             "status",
         ]
+
+
+class ProcessedMessage(BaseMessage):
+    pass

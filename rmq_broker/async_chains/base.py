@@ -4,8 +4,12 @@ from abc import ABC, abstractmethod
 from pydantic.error_wrappers import ValidationError
 from starlette import status
 
-from rmq_broker import models
-from rmq_broker.schemas import IncomingMessage, MessageHeader, OutgoingMessage
+from rmq_broker.models import ErrorMessage, ProcessedMessage, UnprocessedMessage
+from rmq_broker.schemas import (
+    BrokerMessageHeader,
+    ProcessedBrokerMessage,
+    UnprocessedBrokerMessage,
+)
 from rmq_broker.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
@@ -39,7 +43,7 @@ class AbstractChain(ABC):
         )
 
     @abstractmethod
-    async def handle(self, data: IncomingMessage) -> OutgoingMessage:
+    async def handle(self, data: UnprocessedBrokerMessage) -> ProcessedBrokerMessage:
         """
         Вызывает метод handle() у следующего обработчика в цепочке.
 
@@ -53,7 +57,9 @@ class AbstractChain(ABC):
         ...
 
     @abstractmethod
-    def get_response_header(self, data: IncomingMessage) -> MessageHeader:
+    def get_response_header(
+        self, data: UnprocessedBrokerMessage
+    ) -> BrokerMessageHeader:
         """
         Изменяет заголовок запроса.
 
@@ -63,7 +69,9 @@ class AbstractChain(ABC):
         ...  # pragma: no cover
 
     @abstractmethod
-    async def get_response_body(self, data: IncomingMessage) -> OutgoingMessage:
+    async def get_response_body(
+        self, data: UnprocessedBrokerMessage
+    ) -> ProcessedBrokerMessage:
         """
         Изменяет тело запроса.
 
@@ -77,11 +85,11 @@ class AbstractChain(ABC):
 
     def form_response(
         self,
-        data: IncomingMessage,
+        data: UnprocessedBrokerMessage,
         body: dict = None,
         code: int = status.HTTP_200_OK,
         message: str = "",
-    ) -> OutgoingMessage:
+    ) -> ProcessedBrokerMessage:
         body = {} if body is None else body
         data.update({"body": body})
         data.update({"status": {"message": str(message), "code": code}})
@@ -114,7 +122,7 @@ class BaseChain(AbstractChain):
     deprecated: bool = False
     actual: str = ""
 
-    async def handle(self, data: IncomingMessage) -> OutgoingMessage:
+    async def handle(self, data: UnprocessedBrokerMessage) -> ProcessedBrokerMessage:
         """
         Обрабатывает запрос, пропуская его через методы обработки
         заголовка и тела запроса.
@@ -131,19 +139,19 @@ class BaseChain(AbstractChain):
         """
         logger.info(f"{self.__class__.__name__}.get_response_body(): data={data}")
         try:
-            models.IncomingMessage(**data)
+            UnprocessedMessage(**data)
         except ValidationError as error:
             logger.error(f"{self.__class__.__name__}.handle(): {error}")
-            return models.ErrorMessage().generate(message=str(error))
-        response = models.OutgoingMessage().generate()
+            return ErrorMessage().generate(message=str(error))
         if self.request_type.lower() == data["request_type"].lower():
+            response = ProcessedMessage().generate()
             try:
                 response.update(await self.get_response_body(data))
                 logger.debug(
                     f"{self.__class__.__name__}.handle(): After body update {response=}"
                 )
             except Exception as exc:
-                return models.ErrorMessage().generate(message=str(exc))
+                return ErrorMessage().generate(message=str(exc))
             response.update(self.get_response_header(data))
             logger.debug(
                 f"{self.__class__.__name__}.handle(): After header update {response=}"
@@ -155,22 +163,22 @@ class BaseChain(AbstractChain):
                 f"{self.__class__.__name__}.handle(): Before sending {response=}"
             )
             try:
-                models.OutgoingMessage(**response)
+                ProcessedMessage(**response)
                 return response
             except ValidationError as error:
                 logger.error(
                     f"{self.__class__.__name__}.handle(): ValidationError: {error}"
                 )
-                return models.ErrorMessage().generate(message=str(error))
+                return ErrorMessage().generate(message=str(error))
         else:
             logger.error(
                 f"{self.__class__.__name__}.handle(): Unknown request_type='{data['request_type']}'"
             )
-            return models.ErrorMessage().generate(
-                message="Can't handle this request type"
-            )
+            return ErrorMessage().generate(message="Can't handle this request type")
 
-    def get_response_header(self, data: IncomingMessage) -> MessageHeader:
+    def get_response_header(
+        self, data: UnprocessedBrokerMessage
+    ) -> BrokerMessageHeader:
         """
         Меняет местами получателя('dst') и отправителя('src') запроса.
 
@@ -202,10 +210,10 @@ class ChainManager(BaseChain, Singleton):
                     self.add(subclass)
                 self.__init__(subclass)
 
-    async def handle(self, data: IncomingMessage) -> OutgoingMessage:
+    async def handle(self, data: UnprocessedBrokerMessage) -> ProcessedBrokerMessage:
         """Направляет запрос на нужный обработчик."""
         try:
-            models.IncomingMessage(**data)
+            UnprocessedMessage(**data)
             chain = self.chains[data["request_type"].lower()]
             return await chain().handle(data)
         except ValidationError as error:
@@ -213,7 +221,7 @@ class ChainManager(BaseChain, Singleton):
         except KeyError as error:
             msg = f"Can't handle this request type: {error}"
         logger.error(f"{self.__class__.__name__}.handle(): {msg}")
-        return models.ErrorMessage().generate(message=msg)
+        return ErrorMessage().generate(message=msg)
 
     async def get_response_body(self, data):
         pass
