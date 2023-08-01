@@ -100,9 +100,19 @@ class BaseChain(AbstractChain):
 
     Attributes:
         request_type (str): Тип запроса, который обработчик способен обработать.
+        include_in_schema (bool): True (значение по умолчанию) - выводить Chain в Swagger документацию;
+                                False - исключить Chain из Swagger документации.
+        deprecated (bool): False (значение по умолчанию) - Chain актуален;
+                        True - отметить Chain, как устаревший.
+        actual (str): Наименование актуального Chain в Swagger документации. Отображается
+                    рядом с устаревшим Chain (где include_in_schema = True, deprecated = True).
+                    Устанавливает deprecated = True автоматически, если deprecated не был указан как True.
     """
 
     request_type: str = ""
+    include_in_schema: bool = True
+    deprecated: bool = False
+    actual: str = ""
 
     async def handle(self, data: IncomingMessage) -> OutgoingMessage:
         """
