@@ -1,59 +1,29 @@
 from typing import TypedDict
+from uuid import UUID
 
-from schema import Optional, Or, Schema
 from typing_extensions import NotRequired
 
 
-class MessageHeader(TypedDict):
+class BrokerMessageHeader(TypedDict):
     dst: str
     src: str
 
 
-class MessageStatus(TypedDict):
+class BrokerMessageStatus(TypedDict):
     code: int
     message: str
 
 
 class BrokerMessage(TypedDict):
     request_type: str
-    request_id: str
-    header: MessageHeader
+    request_id: UUID
+    header: BrokerMessageHeader
     body: dict
 
 
-class IncomingMessage(BrokerMessage):
-    status: NotRequired[MessageStatus]
+class UnprocessedBrokerMessage(BrokerMessage):
+    status: NotRequired[BrokerMessageStatus]
 
 
-class OutgoingMessage(BrokerMessage):
-    status: MessageStatus
-
-
-PreMessage = Schema(
-    {
-        "request_type": str,
-        "request_id": str,
-        "header": {"src": str, "dst": str},
-        "body": object,
-        Optional("status"): dict,
-    }
-)
-
-
-PostMessage = Schema(
-    {
-        "request_type": str,
-        "request_id": str,
-        "header": {"src": str, "dst": str},
-        "body": object,
-        "status": {"message": str, "code": Or(int, str)},
-    }
-)
-
-MessageTemplate = {
-    "request_type": "",
-    "request_id": "",
-    "header": {"src": "", "dst": ""},
-    "body": {},
-    "status": {"message": "", "code": ""},
-}
+class ProcessedBrokerMessage(BrokerMessage):
+    status: BrokerMessageStatus

@@ -1,18 +1,16 @@
 import logging
 from abc import ABC, abstractmethod
 
-from schema import Schema, SchemaError
+from pydantic.error_wrappers import ValidationError
 from starlette import status
 
+from rmq_broker.models import ErrorMessage, ProcessedMessage, UnprocessedMessage
 from rmq_broker.schemas import (
-    IncomingMessage,
-    MessageHeader,
-    MessageTemplate,
-    OutgoingMessage,
-    PostMessage,
-    PreMessage,
+    BrokerMessageHeader,
+    ProcessedBrokerMessage,
+    UnprocessedBrokerMessage,
 )
-from rmq_broker.utils import Singleton
+from rmq_broker.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +43,7 @@ class AbstractChain(ABC):
         )
 
     @abstractmethod
-    async def handle(self, data: IncomingMessage) -> OutgoingMessage:
+    async def handle(self, data: UnprocessedBrokerMessage) -> ProcessedBrokerMessage:
         """
         Вызывает метод handle() у следующего обработчика в цепочке.
 
@@ -59,7 +57,9 @@ class AbstractChain(ABC):
         ...
 
     @abstractmethod
-    def get_response_header(self, data: IncomingMessage) -> MessageHeader:
+    def get_response_header(
+        self, data: UnprocessedBrokerMessage
+    ) -> BrokerMessageHeader:
         """
         Изменяет заголовок запроса.
 
@@ -69,7 +69,9 @@ class AbstractChain(ABC):
         ...  # pragma: no cover
 
     @abstractmethod
-    async def get_response_body(self, data: IncomingMessage) -> OutgoingMessage:
+    async def get_response_body(
+        self, data: UnprocessedBrokerMessage
+    ) -> ProcessedBrokerMessage:
         """
         Изменяет тело запроса.
 
@@ -81,17 +83,13 @@ class AbstractChain(ABC):
         """
         ...  # pragma: no cover
 
-    @abstractmethod
-    def validate(self, data: IncomingMessage) -> None:
-        ...  # pragma: no cover
-
     def form_response(
         self,
-        data: IncomingMessage,
+        data: UnprocessedBrokerMessage,
         body: dict = None,
         code: int = status.HTTP_200_OK,
         message: str = "",
-    ) -> OutgoingMessage:
+    ) -> ProcessedBrokerMessage:
         body = {} if body is None else body
         data.update({"body": body})
         data.update({"status": {"message": str(message), "code": code}})
@@ -124,7 +122,7 @@ class BaseChain(AbstractChain):
     deprecated: bool = False
     actual: str = ""
 
-    async def handle(self, data: IncomingMessage) -> OutgoingMessage:
+    async def handle(self, data: UnprocessedBrokerMessage) -> ProcessedBrokerMessage:
         """
         Обрабатывает запрос, пропуская его через методы обработки
         заголовка и тела запроса.
@@ -141,49 +139,46 @@ class BaseChain(AbstractChain):
         """
         logger.info(f"{self.__class__.__name__}.get_response_body(): data={data}")
         try:
-            self.validate(data, PreMessage)
-        except SchemaError as e:
-            logger.error(f"{self.__class__.__name__}.handle(): SchemaError: {e}")
-            return self.form_response(
-                MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
-            )
-        response = {}
-        if self.request_type == data["request_type"]:
-            response["request_id"] = data["request_id"]
-            response["request_type"] = data["request_type"]
+            UnprocessedMessage(**data)
+        except ValidationError as error:
+            logger.error(f"{self.__class__.__name__}.handle(): {error}")
+            return ErrorMessage().generate(message=str(error))
+        if self.request_type.lower() == data["request_type"].lower():
+            response = ProcessedMessage().generate()
             try:
                 response.update(await self.get_response_body(data))
                 logger.debug(
                     f"{self.__class__.__name__}.handle(): After body update {response=}"
                 )
-            except Exception as e:
-                return self.form_response(
-                    MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
-                )
+            except Exception as exc:
+                return ErrorMessage().generate(message=str(exc))
             response.update(self.get_response_header(data))
             logger.debug(
                 f"{self.__class__.__name__}.handle(): After header update {response=}"
             )
+            # These field must stay the same.
+            response["request_id"] = data["request_id"]
+            response["request_type"] = data["request_type"]
+            logger.debug(
+                f"{self.__class__.__name__}.handle(): Before sending {response=}"
+            )
             try:
-                self.validate(response, PostMessage)
+                ProcessedMessage(**response)
                 return response
-            except SchemaError as e:
-                logger.error(f"{self.__class__.__name__}.handle(): SchemaError: {e}")
-                return self.form_response(
-                    MessageTemplate, {}, status.HTTP_400_BAD_REQUEST, e
+            except ValidationError as error:
+                logger.error(
+                    f"{self.__class__.__name__}.handle(): ValidationError: {error}"
                 )
+                return ErrorMessage().generate(message=str(error))
         else:
             logger.error(
                 f"{self.__class__.__name__}.handle(): Unknown request_type='{data['request_type']}'"
             )
-            return self.form_response(
-                MessageTemplate,
-                {},
-                status.HTTP_400_BAD_REQUEST,
-                "Can't handle this request type",
-            )
+            return ErrorMessage().generate(message="Can't handle this request type")
 
-    def get_response_header(self, data: IncomingMessage) -> MessageHeader:
+    def get_response_header(
+        self, data: UnprocessedBrokerMessage
+    ) -> BrokerMessageHeader:
         """
         Меняет местами получателя('dst') и отправителя('src') запроса.
 
@@ -201,17 +196,6 @@ class BaseChain(AbstractChain):
         )
         return updated_header
 
-    def validate(self, message: IncomingMessage, schema: Schema) -> None:
-        """Валидирует сообщение по переданной схеме.
-
-        Raises:
-            SchemaError: Валидация не была пройдена.
-        """
-        schema.validate(message)
-        logger.debug(
-            f"{self.__class__.__name__}.validate(): Successful validation, {message=}"
-        )
-
 
 class ChainManager(BaseChain, Singleton):
     """Единая точка для распределения запросов по обработчикам."""
@@ -226,23 +210,18 @@ class ChainManager(BaseChain, Singleton):
                     self.add(subclass)
                 self.__init__(subclass)
 
-    async def handle(self, data: IncomingMessage) -> OutgoingMessage:
+    async def handle(self, data: UnprocessedBrokerMessage) -> ProcessedBrokerMessage:
         """Направляет запрос на нужный обработчик."""
         try:
-            self.validate(data, PreMessage)
+            UnprocessedMessage(**data)
             chain = self.chains[data["request_type"].lower()]
             return await chain().handle(data)
-        except SchemaError as e:
-            msg = f"Incoming message validation error: {e}"
-        except KeyError as e:
-            msg = f"Can't handle this request type: {e}"
+        except ValidationError as error:
+            msg = f"Incoming message validation error: {error}"
+        except KeyError as error:
+            msg = f"Can't handle this request type: {error}"
         logger.error(f"{self.__class__.__name__}.handle(): {msg}")
-        return self.form_response(
-            MessageTemplate,
-            {},
-            status.HTTP_400_BAD_REQUEST,
-            msg,
-        )
+        return ErrorMessage().generate(message=msg)
 
     async def get_response_body(self, data):
         pass

@@ -4,7 +4,7 @@ from typing import Tuple
 from rmq_broker.async_chains.base import BaseChain as AsyncBaseChain
 from rmq_broker.async_chains.base import ChainManager
 from rmq_broker.chains.base import BaseChain
-from rmq_broker.schemas import IncomingMessage, OutgoingMessage
+from rmq_broker.schemas import ProcessedBrokerMessage, UnprocessedBrokerMessage
 from rmq_broker.settings import settings
 
 from . import REF_PREFIX
@@ -30,10 +30,10 @@ class BaseDocsChain:
             "operationId": chain.request_type,
         }
         if chain.deprecated:
-            operation['deprecated'] = True
+            operation["deprecated"] = True
         if chain.actual:
-            operation['deprecated'] = True
-            operation['summary'] += ". Актуальный - " + chain.actual + "."
+            operation["deprecated"] = True
+            operation["summary"] += ". Актуальный - " + chain.actual + "."
         request_body = {
             "required": required,
         }
@@ -56,7 +56,11 @@ class BaseDocsChain:
             "openapi": self.openapi_version,
             "info": {"title": self.title, "version": self.version},
         }
-        chains = [chain() for chain in chain_manager.chains.values() if chain.include_in_schema]
+        chains = [
+            chain()
+            for chain in chain_manager.chains.values()
+            if chain.include_in_schema
+        ]
         components: dict = {}
         paths = defaultdict(dict)
 
@@ -81,14 +85,18 @@ class BaseDocsChain:
 
 
 class DocsChain(BaseDocsChain, BaseChain):
-    def get_response_body(self, data: IncomingMessage) -> OutgoingMessage:
+    def get_response_body(
+        self, data: UnprocessedBrokerMessage
+    ) -> ProcessedBrokerMessage:
         if not self.openapi:
             self.openapi = self.make_openapi(chain_manager=ChainManager())
         return self.form_response(data, self.openapi)
 
 
 class AsyncDocsChain(BaseDocsChain, AsyncBaseChain):
-    async def get_response_body(self, data: IncomingMessage) -> OutgoingMessage:
+    async def get_response_body(
+        self, data: UnprocessedBrokerMessage
+    ) -> ProcessedBrokerMessage:
         if not self.openapi:
             self.openapi = self.make_openapi(chain_manager=ChainManager())
         return self.form_response(data, self.openapi)

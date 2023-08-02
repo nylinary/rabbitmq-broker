@@ -17,7 +17,6 @@ class AsyncAbstractMessageQueue(ABC):
         self.broker_url = self.config["broker_url"]
         self.connection = None
         self.client_properties = None
-        self.rpc = None
         logger.debug("%s: Initialized" % self.__class__.__name__)
 
     @abstractmethod
