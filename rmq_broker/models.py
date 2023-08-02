@@ -49,26 +49,14 @@ class BaseMessage(BaseModel):
 
     def generate(self, **fields) -> dict:
         """Генерирует сообщение."""
-        flat_message = self.get_flat_message_frame()
-        flat_message = self.populate_flat_message(flat_message, **fields)
+        flat_message = self.generate_flat_message(**fields)
         return self.get_structured_message(flat_message)
 
-    def get_flat_message_frame(self) -> dict:
-        """Возвращает плоскую структуру сообщения."""
-        return {
-            "request_type": "",
-            "request_id": "",
-            "dst": "",
-            "src": "",
-            "body": {},
-            "message": "",
-            "code": "",
-        }
-
-    def populate_flat_message(self, flat_message: dict, **fields) -> dict:
+    def generate_flat_message(self, **fields) -> dict:
         """Заполняет плоскую структуру сообщения переданными значениями.
         Если значение не указано - берет его из DefaultValues.
         """
+        flat_message = dict()
         for field_name, default_value in self.get_required_attributes().items():
             if value := fields.get(field_name):
                 flat_message[field_name] = value
