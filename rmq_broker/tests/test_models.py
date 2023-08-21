@@ -22,6 +22,7 @@ class TestBaseMessage:
         assert not message.get("header")
 
 
+# TODO Rename test names according to model names
 class TestOutgoingMessage:
     def test_outgoing_message_validation(self):
         message = MessageFactory.get_processed_message()
