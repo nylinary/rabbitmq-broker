@@ -59,6 +59,8 @@ class BaseMessage(BaseModel):
         flat_message = dict()
         for field_name, default_value in self.get_required_attributes().items():
             if value := fields.get(field_name):
+                if isinstance(default_value, str):
+                    value = str(value)
                 flat_message[field_name] = value
             else:
                 flat_message[field_name] = default_value
