@@ -66,11 +66,18 @@ class BaseService:
                 )
                 ProcessedMessage(**response)
                 return response
+        except ValidationError as error:
+            # Временный фикс, пока все сервисы не перейдут на новую версию пакета.
+            logger.error(
+                "{}.post_message: UnprocessedMessage validation failed!: {}".format(
+                    self.__class__.__name__, error
+                )
+            )
+            return response
         except (
             asyncio.TimeoutError,
             asyncio.CancelledError,
             RuntimeError,
-            ValidationError,
         ) as err:
             return ErrorMessage().generate(
                 request_id=message["request_id"],
