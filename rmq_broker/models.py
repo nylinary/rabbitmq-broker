@@ -14,11 +14,10 @@ dst и src. Вложенная структура(header, status) формиру
     >>> {"header": {"src": "", "dst": "destination"}, "request_type": "creation"...}
 """
 
-import inspect
 from typing import Iterable, Optional, Union
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette import status as http_code
 
 
@@ -57,7 +56,7 @@ class BaseMessage(BaseModel):
         Если значение не указано - берет его из DefaultValues.
         """
         flat_message = dict()
-        for field_name, default_value in self.get_required_attributes().items():
+        for field_name, default_value in self.DefaultValues().dict().items():
             if value := fields.get(field_name):
                 if isinstance(default_value, str):
                     value = str(value)
@@ -65,17 +64,6 @@ class BaseMessage(BaseModel):
             else:
                 flat_message[field_name] = default_value
         return flat_message
-
-    def get_required_attributes(self) -> dict:
-        """Отдает аттрибуты класса DefaultValues, относящиеся к
-        ключам сообщения.
-        """
-        attributes = dict()
-        for attr_info in inspect.getmembers(self.DefaultValues):
-            if not attr_info[0].startswith("_"):
-                if not inspect.ismethod(attr_info[1]):
-                    attributes[attr_info[0]] = attr_info[1]
-        return attributes
 
     def get_structured_message(self, flat_message: dict) -> dict:
         """Создает вложенность в плоском сообщении."""
@@ -120,10 +108,10 @@ class BaseMessage(BaseModel):
 
         to_exclude = []
 
-    class DefaultValues:
+    class DefaultValues(BaseModel):
         """Значения по умолчанию при генерации сообщения."""
 
-        request_id: UUID = uuid4().hex
+        request_id: UUID = Field(default_factory=uuid4)
         request_type: str = ""
         body: dict = dict()
         src: str = ""
