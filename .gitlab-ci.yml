@@ -26,8 +26,8 @@ build:
           rabbitmq-broker
       [rabbitmq-broker]
           repository: https://upload.pypi.org/legacy/
-          username: ${PYPI_USERNAME}
-          password: ${PYPI_PASSWORD}
+          username: __token__
+          password: ${PYPI_TOKEN}
       EOT
     - cat .pypirc
     # https://medium.com/maisonsdumonde/gitlab-ci-cd-and-gitlab-pypi-repository-4916a51d22eb
