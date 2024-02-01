@@ -56,7 +56,7 @@ class BaseChain(AsyncBaseChain):
             # These field must stay the same.
             response["request_id"] = data["request_id"]
             response["request_type"] = data["request_type"]
-            logger.debug(
+            logger.info(
                 "%s.handle(): Before sending response=%s",
                 self.__class__.__name__,
                 response,
