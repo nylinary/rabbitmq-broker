@@ -26,9 +26,9 @@ class AsyncRabbitMessageQueue(AsyncAbstractMessageQueue):
             UnprocessedMessage(**data)
         except ValidationError as error:
             logger.error(
-                "%s.post_message(): UnprocessedMessage validation failed!: %s",
-                self.__class__.__name__,
-                str(error),
+                "{}.post_message: UnprocessedMessage validation failed!: {}".format(
+                    self.__class__.__name__, error
+                )
             )
             return ErrorMessage().generate(message=str(error))
         response = await self.rpc.call(worker, kwargs=dict(data=data))

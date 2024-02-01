@@ -30,52 +30,44 @@ class BaseChain(AsyncBaseChain):
             Метод handle() у родительского класса: если типы запроса переданного сообщения
             и конкретного экземпляра обработчика отличаются.
         """
-        logger.info("%s.get_response_body(): data=%s", self.__class__.__name__, data)
+        logger.info(f"{self.__class__.__name__}.get_response_body(): data={data}")
         try:
             UnprocessedMessage(**data)
         except ValidationError as error:
-            logger.error("%s.handle(): %s", self.__class__.__name__, str(error))
+            logger.error(
+                f"{self.__class__.__name__}.handle(): ValidationError: {error}"
+            )
             return ErrorMessage().generate(message=str(error))
         if self.request_type.lower() == data["request_type"].lower():
             response = ProcessedMessage().generate()
             try:
                 response.update(self.get_response_body(data))
                 logger.debug(
-                    "%s.handle(): After body update response=%s",
-                    self.__class__.__name__,
-                    response,
+                    f"{self.__class__.__name__}.handle(): After body update {response=}"
                 )
             except Exception as exc:
                 return ErrorMessage().generate(message=str(exc))
             response.update(self.get_response_header(data))
             logger.debug(
-                "%s.handle(): After header update response=%s",
-                self.__class__.__name__,
-                response,
+                f"{self.__class__.__name__}.handle(): After header update {response=}"
             )
             # These field must stay the same.
             response["request_id"] = data["request_id"]
             response["request_type"] = data["request_type"]
             logger.debug(
-                "%s.handle(): Before sending response=%s",
-                self.__class__.__name__,
-                response,
+                f"{self.__class__.__name__}.handle(): Before sending {response=}"
             )
             try:
                 ProcessedMessage(**response)
                 return response
             except ValidationError as error:
                 logger.error(
-                    "%s.handle(): ValidationError: %s",
-                    self.__class__.__name__,
-                    str(error),
+                    f"{self.__class__.__name__}.handle(): ValidationError: {error}"
                 )
                 return ErrorMessage().generate(message=str(error))
         else:
             logger.error(
-                "%s.handle(): Unknown request_type=%s",
-                self.__class__.__name__,
-                data["request_type"],
+                f"{self.__class__.__name__}.handle(): Unknown request_type='{data['request_type']}'"
             )
             return ErrorMessage().generate(message="Can't handle this request type")
 
@@ -99,7 +91,7 @@ class ChainManager(AsyncChainManager, Singleton):
             msg = f"Incoming message validation error: {error}"
         except KeyError as error:
             msg = f"Can't handle this request type: {error}"
-        logger.error("%s.handle(): %s", self.__class__.__name__, msg)
+        logger.error(f"{self.__class__.__name__}: handle(data): {msg}")
         return ErrorMessage().generate(message=msg)
 
     def get_response_body(self, data):
