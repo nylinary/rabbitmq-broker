@@ -17,7 +17,9 @@ class AsyncAbstractMessageQueue(ABC):
         self.broker_url = self.config["broker_url"]
         self.connection = None
         self.client_properties = None
-        logger.debug("%s: Initialized" % self.__class__.__name__)
+        logger.debug(
+            "%s.%s: Initialized", self.__class__.__name__, self.__init__.__name__
+        )
 
     @abstractmethod
     async def __aenter__(self):

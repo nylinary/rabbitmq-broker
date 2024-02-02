@@ -16,7 +16,11 @@ class AsyncRabbitMessageQueue(AsyncAbstractMessageQueue):
     MessageQueue: str = "rabbitmq"
 
     async def consume(self) -> None:
-        logger.info("%s.consume: RPC consumer started" % self.__class__.__name__)
+        logger.info(
+            "%s.%s: RPC consumer started",
+            self.__class__.__name__,
+            self.consume.__name__,
+        )
         await asyncio.Future()
 
     async def post_message(
@@ -26,8 +30,9 @@ class AsyncRabbitMessageQueue(AsyncAbstractMessageQueue):
             UnprocessedMessage(**data)
         except ValidationError as error:
             logger.error(
-                "%s.post_message(): UnprocessedMessage validation failed!: %s",
+                "%s.%s: UnprocessedMessage validation failed!: %s",
                 self.__class__.__name__,
+                self.post_message.__name__,
                 str(error),
             )
             return ErrorMessage().generate(message=str(error))
@@ -53,7 +58,11 @@ class AsyncRabbitMessageQueue(AsyncAbstractMessageQueue):
         Метод входа в контекст подключения
         """
         if self.connection is None or self.connection.is_closed:
-            logger.info("%s.__aenter__: Created connection" % self.__class__.__name__)
+            logger.info(
+                "%s.%s: Created connection",
+                self.__class__.__name__,
+                self.__aenter__.__name__,
+            )
             self.connection = await aio_pika.connect_robust(
                 self.broker_url,
             )

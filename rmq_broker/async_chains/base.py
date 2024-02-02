@@ -23,8 +23,9 @@ class AbstractChain(ABC):
         """Добавляет нового обработчика в цепочку."""
         self.chains[chain.request_type.lower()] = chain
         logger.debug(
-            "%s.add(): %s added to chains.",
+            "%s.%s: %s added to chains.",
             self.__class__.__name__,
+            self.add.__name__,
             chain.__name__,
         )
 
@@ -55,8 +56,9 @@ class AbstractChain(ABC):
         data.update({"body": body})
         data.update({"status": {"message": str(message), "code": code}})
         logger.debug(
-            "%s.form_response(): Formed response data=%s",
+            "%s.%s: Formed response data=%s",
             self.__class__.__name__,
+            self.form_response.__name__,
             data,
         )
         return data
@@ -100,18 +102,23 @@ class BaseChain(AbstractChain):
             Метод handle() у родительского класса: если типы запроса переданного сообщения
             и конкретного экземпляра обработчика отличаются.
         """
-        logger.info("%s.get_response_body(): data=%s", self.__class__.__name__, data)
+        logger.info(
+            "%s.%s: data=%s", self.__class__.__name__, self.handle.__name__, data
+        )
         try:
             UnprocessedMessage(**data)
         except ValidationError as error:
-            logger.error("%s.handle(): %s", self.__class__.__name__, str(error))
+            logger.error(
+                "%s.%s: %s", self.__class__.__name__, self.handle.__name__, str(error)
+            )
             return ErrorMessage().generate(message=str(error))
         if self.request_type.lower() == data["request_type"].lower():
             response = ProcessedMessage().generate()
             try:
                 response.update(await self.get_response_body(data))
                 logger.debug(
-                    "%s.handle(): After body update response=%s",
+                    "%s.%s: After body update response=%s",
+                    self.handle.__name__,
                     self.__class__.__name__,
                     response,
                 )
@@ -119,16 +126,18 @@ class BaseChain(AbstractChain):
                 return ErrorMessage().generate(message=str(exc))
             response.update(self.get_response_header(data))
             logger.debug(
-                "%s.handle(): After header update response=%s",
+                "%s.%s: After header update response=%s",
                 self.__class__.__name__,
+                self.handle.__name__,
                 response,
             )
             # These field must stay the same.
             response["request_id"] = data["request_id"]
             response["request_type"] = data["request_type"]
             logger.info(
-                "%s.handle(): Before sending response=%s",
+                "%s.%s: Before sending response=%s",
                 self.__class__.__name__,
+                self.handle.__name__,
                 response,
             )
             try:
@@ -136,15 +145,17 @@ class BaseChain(AbstractChain):
                 return response
             except ValidationError as error:
                 logger.error(
-                    "%s.handle(): ValidationError: %s",
+                    "%s.%s: ValidationError: %s",
                     self.__class__.__name__,
+                    self.handle.__name__,
                     str(error),
                 )
                 return ErrorMessage().generate(message=str(error))
         else:
             logger.error(
-                "%s.handle(): Unknown request_type=%s",
+                "%s.%s: Unknown request_type=%s",
                 self.__class__.__name__,
+                self.handle.__name__,
                 data["request_type"],
             )
             return ErrorMessage().generate(message="Can't handle this request type")
@@ -157,8 +168,9 @@ class BaseChain(AbstractChain):
             "header": {"src": data["header"]["dst"], "dst": data["header"]["src"]}
         }
         logger.debug(
-            "%s.get_response_header(): updated_header=%s",
+            "%s.%s: updated_header=%s",
             self.__class__.__name__,
+            self.get_response_header.__name__,
             updated_header,
         )
         return updated_header
@@ -187,7 +199,7 @@ class ChainManager(BaseChain, Singleton):
             msg = f"Incoming message validation error: {error}"
         except KeyError as error:
             msg = f"Can't handle this request type: {error}"
-        logger.error("%s.handle(): %s", self.__class__.__name__, msg)
+        logger.error("%s.%s: %s", self.__class__.__name__, self.handle.__name__, msg)
         return ErrorMessage().generate(message=msg)
 
     async def get_response_body(self, data):
