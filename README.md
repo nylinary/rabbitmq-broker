@@ -65,6 +65,22 @@ class LoginChain(BaseChain):
 `code`: HTTP код ответа.
 `message`: Сообщение к ответу.
 
+### Модели
+Доработанные pydantic модели - могут быть использованы как для валидации,
+так и для генерации сообщения.
+
+Валидация сообщения происходит так же, как и в обычной pydantic модели:
+
+    ProcessedMessage(**message_dict)
+
+Для генерации сообщения необходимо создать объект модели, не передавая аргументы
+при инициализации, и вызвать метод generate. В аргументы метода generate можно
+передавать любой из ключей структуры сообщения, в том числе code, message,
+dst и src. Вложенная структура(header, status) формируется сама:
+
+    >>> ProcessedMessage().generate(dst="destination", code=201, request_type="creation")
+    >>> {"header": {"src": "", "dst": "destination"}, "request_type": "creation"...}
+
 ### RPC брокер
 
 Запуск прослушки и автоматического ответа на сообщения.
