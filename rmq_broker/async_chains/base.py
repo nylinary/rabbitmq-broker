@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from typing import Dict
 
 from pydantic.error_wrappers import ValidationError
 from starlette import status
@@ -16,27 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractChain(ABC):
-    """Интерфейс классов обработчиков.
+    chains: Dict[str, "BaseChain"] = {}
 
-    Args:
-        ABC : Вспомогательный класс, предоставляющий стандартный способ
-              создания абстрактного класса.
-
-    Arguments:
-        chains (dict): {request_type:объект чейна}
-    """
-
-    chains: dict = {}
-
-    def add(self, chain: object) -> None:
-        """
-        Добавляет нового обработчика в цепочку.
-        Args:
-            chain: Экземпляр обработчика.
-
-        Returns:
-            None
-        """
+    def add(self, chain: "BaseChain") -> None:
+        """Добавляет нового обработчика в цепочку."""
         self.chains[chain.request_type.lower()] = chain
         logger.debug(
             "%s.add(): %s added to chains.",
@@ -46,43 +30,18 @@ class AbstractChain(ABC):
 
     @abstractmethod
     async def handle(self, data: UnprocessedBrokerMessage) -> ProcessedBrokerMessage:
-        """
-        Вызывает метод handle() у следующего обработчика в цепочке.
-
-        Args:
-            data (dict): Словарь с запросом.
-
-        Returns:
-            None: если следующий обработчик не определен.
-            Обработанный запрос: если следующий обработчик определен.
-        """
         ...
 
     @abstractmethod
     def get_response_header(
         self, data: UnprocessedBrokerMessage
     ) -> BrokerMessageHeader:
-        """
-        Изменяет заголовок запроса.
-
-        Args:
-            data (dict): Словарь с запросом.
-        """
         ...  # pragma: no cover
 
     @abstractmethod
     async def get_response_body(
         self, data: UnprocessedBrokerMessage
     ) -> ProcessedBrokerMessage:
-        """
-        Изменяет тело запроса.
-
-        Args:
-            data (dict): Словарь с запросом.
-
-        Returns:
-            Cловарь c ответом.
-        """
         ...  # pragma: no cover
 
     def form_response(
@@ -92,7 +51,7 @@ class AbstractChain(ABC):
         code: int = status.HTTP_200_OK,
         message: str = "",
     ) -> ProcessedBrokerMessage:
-        body = {} if body is None else body
+        body = body or {}
         data.update({"body": body})
         data.update({"status": {"message": str(message), "code": code}})
         logger.debug(
@@ -193,15 +152,7 @@ class BaseChain(AbstractChain):
     def get_response_header(
         self, data: UnprocessedBrokerMessage
     ) -> BrokerMessageHeader:
-        """
-        Меняет местами получателя('dst') и отправителя('src') запроса.
-
-        Args:
-            data (dict): Словарь с запросом.
-
-        Returns:
-            Словарь заголовка запроса.
-        """
+        """Меняет местами получателя('dst') и отправителя('src') запроса."""
         updated_header = {
             "header": {"src": data["header"]["dst"], "dst": data["header"]["src"]}
         }
