@@ -52,9 +52,10 @@ class BaseService:
             UnprocessedMessage(**message)
         except ValidationError as error:
             logger.error(
-                "{}.post_message: UnprocessedMessage validation failed!: {}".format(
-                    self.__class__.__name__, error
-                )
+                "%s.%s: UnprocessedMessage validation failed!: %s",
+                self.__class__.__name__,
+                self.send_rpc_request.__name__,
+                str(error),
             )
             return ErrorMessage().generate(message=str(error))
         try:
@@ -69,9 +70,10 @@ class BaseService:
         except ValidationError as error:
             # Временный фикс, пока все сервисы не перейдут на новую версию пакета.
             logger.error(
-                "{}.post_message: UnprocessedMessage validation failed!: {}".format(
-                    self.__class__.__name__, error
-                )
+                "%s.%s: UnprocessedMessage validation failed!: %s",
+                self.__class__.__name__,
+                self.send_rpc_request.__name__,
+                str(error),
             )
             return response
         except (
