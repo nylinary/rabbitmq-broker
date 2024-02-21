@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rabbitmq-broker"
-version = "1.2.4"
+version = "1.2.5"
 authors = [
   { name="Nikita Sysoev", email="njt55cs@gmail.com" },
 ]
@@ -20,6 +20,7 @@ dependencies = [
     "aio-pika ~= 9.0.2",
     "django-environ ~= 0.9.0",
     "starlette ~= 0.25.0",
+    "webportal-utils >= 0.1.1",
 ]
 
 [project.urls]
