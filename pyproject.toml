@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rabbitmq-broker"
-version = "1.2.5"
+version = "1.2.6"
 authors = [
   { name="Nikita Sysoev", email="njt55cs@gmail.com" },
 ]
@@ -24,3 +24,6 @@ dependencies = [
 ]
 
 [project.urls]
+Homepage = "https://github.com/nylinary/rabbitmq-broker"
+Repository = "https://github.com/nylinary/rabbitmq-broker"
+Issues = "https://github.com/nylinary/rabbitmq-broker/issues"
